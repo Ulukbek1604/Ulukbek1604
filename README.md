@@ -1,4 +1,4 @@
-# Hi there, I'm Ulukbek! 👋 | Привет, я Улукбек!
+# Hi there, I'm Ilias! 👋 | Привет, я Ильяс!
 
 ### 🎓 About Me | Обо мне
 * 🏛️ **3rd-year Student** at Kyrgyz State Technical University (KGTU / Политех).
