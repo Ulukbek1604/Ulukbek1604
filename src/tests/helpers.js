@@ -4,7 +4,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require('playwright');
 
-const PAGE = pathToFileURL(path.join(__dirname, '..', 'src', 'kassa.html')).href;
+const PAGE = pathToFileURL(path.join(__dirname, '..', 'kassa.html')).href;
 
 let browser = null;
 

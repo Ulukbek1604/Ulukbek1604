@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { fingerprint, keyFor, keyFits, tidy } = require('../src/ключи.js');
+const { fingerprint, keyFor, keyFits, tidy } = require('../ключи.js');
 
 const PRINT = 'A1B2-C3D4-E5F6';
 
