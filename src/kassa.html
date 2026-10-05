@@ -43,6 +43,8 @@
     --money:  #0b6b4f;
     --cut:    #b4531a;
     --alarm:  #b3261e;
+    /* Ссылки «сделать скидку» и «скинуть с чека»: цвет скидки, а не текста. */
+    --red:    var(--cut);
 
     /* Ряды графиков: себестоимость и прибыль. */
     --mark-1: #2f6fb5;
@@ -237,6 +239,17 @@
   .chipx[aria-pressed="true"] { border-color: var(--cut); color: var(--cut); font-weight: 600;
                                 background: color-mix(in srgb, var(--cut) 8%, transparent); }
 
+  .staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--s3); margin-top: var(--s4); }
+  .staff { display: flex; flex-direction: column; align-items: center; gap: var(--s3); padding: var(--s5) var(--s3);
+         background: var(--card); border: 1px solid var(--line); border-radius: var(--r); color: var(--ink);
+         font-size: 17px; font-weight: 600; transition: border-color .15s; }
+  .staff:hover { border-color: var(--brand); }
+  .staff .ava { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center;
+              background: var(--brand); color: var(--on-brand); font-size: 22px; font-weight: 700; }
+  .linkbtn { display: inline-flex; align-items: center; margin-left: var(--s2); padding: 3px 10px;
+             border: 1px solid var(--edge); border-radius: var(--r); background: var(--card);
+             color: var(--ink-2); font-size: 12px; font-weight: 600; }
+  .linkbtn:hover { border-color: var(--brand); color: var(--ink); }
   .stepper { display: flex; align-items: center; gap: 2px; }
   .stepper button { width: 36px; height: 36px; border: 1px solid var(--edge); background: var(--card);
                     border-radius: var(--r); display: grid; place-items: center; padding: 0; }
@@ -1597,6 +1610,15 @@ const DESK = typeof window !== 'undefined' ? window.kassa : null;
  */
 const isSerial = (g) => !!(g.mem || g.ram) || g.codes.length > 1;
 
+/** Чекам без номера — номера по порядку времени, продолжая уже выданные. */
+function numberChecks(d) {
+  let max = (d.checks ?? []).reduce((m, c) => Math.max(m, c.no ?? 0), 0);
+  for (const c of [...(d.checks ?? [])].sort((a, b) => a.at - b.at)) {
+    if (typeof c.no !== 'number') c.no = ++max;
+  }
+  return d;
+}
+
 function fixUp(d) {
   for (const g of d.goods ?? []) {
     if (!Array.isArray(g.codes)) g.codes = g.code ? [String(g.code)] : [];
@@ -1605,6 +1627,7 @@ function fixUp(d) {
     // Телефоны и прочее с памятью — штучный товар, код на каждой коробке свой.
   }
   if (typeof d.limitOn !== 'boolean') d.limitOn = true;
+  numberChecks(d);
   if (!d.accounts || typeof d.accounts !== 'object') d.accounts = { owner: '', cashier: '' };
   if (/^\d{4}$/.test(String(d.accounts.owner ?? ''))) {
     d.accounts.owner = pinPack(d.accounts.owner);
@@ -1689,6 +1712,7 @@ data.role = signed;
 // магазина отчёт честно пуст, пока не появятся настоящие продажи.
 if (!DESK && !data.checks.some((c) => c.at < Date.now() - 24 * 3600e3)) {
   data.checks = [...makeHistory(), ...data.checks];
+  numberChecks(data);
 }
 
 /** Чек: строки по товару, у каждой своя скидка в сомах. */
@@ -2059,9 +2083,12 @@ function viewWho() {
   return `
     <h2>Кто за кассой?</h2>
     <p class="q">Нажмите на своё имя: продажи запишутся на вас.</p>
-    <div class="goods">
+    <div class="staff-grid">
       ${data.staff.map((s) => `
-        <button class="good" type="button" data-who="${esc(s.id)}"><span class="t">${esc(s.name)}</span></button>`).join('')}
+        <button class="staff" type="button" data-who="${esc(s.id)}">
+          <span class="ava" aria-hidden="true">${esc(s.name.trim().charAt(0).toUpperCase())}</span>
+          <span>${esc(s.name)}</span>
+        </button>`).join('')}
     </div>`;
 }
 
@@ -2080,8 +2107,8 @@ function viewSale() {
     <div class="two-pane">
       <div>
         ${staleNote()}
-        ${owner() ? '' : `<p class="q2" style="margin:0 0 10px">Продаёт: <b>${esc(me().name)}</b>
-          <button class="plain q2" id="who-change" type="button" style="color:var(--red);font-weight:600;width:auto">сменить</button></p>`}
+        ${owner() ? '' : `<p class="q2" style="margin:0 0 10px;display:flex;align-items:center">Продаёт:&nbsp;<b>${esc(me().name)}</b>
+          <button class="linkbtn" id="who-change" type="button">сменить</button></p>`}
         ${scanBox()}
         ${lastScan ? `<p class="q2" style="margin-top:10px">Последний код: <b class="n">${esc(lastScan)}</b></p>` : ''}
 
@@ -2115,9 +2142,10 @@ function viewSale() {
                   </div>
                   <div style="text-align:right">
                     <div class="amt n">${som(sum - l.off)}</div>
-                    <div class="stepper" style="margin-top:6px">
+                    <div class="stepper" style="margin-top:6px;justify-content:flex-end">
                       <button type="button" data-less="${l.id}" aria-label="Убрать одну">${svg('minus')}</button>
                       <span class="v">${l.qty}</span>
+                      ${isSerial(g) ? '' : `<button type="button" data-more="${l.id}" aria-label="Добавить ещё одну">${svg('plus')}</button>`}
                     </div>
                   </div>
                 </div>`;
@@ -2318,6 +2346,8 @@ function viewReport() {
       <div class="figure"><b>${som(stockCost)}</b><span>денег в товаре</span></div>
     </div>
 
+    ${closeBox()}
+
     ${whoSold()}
 
     <h2>Как идёт торговля</h2>
@@ -2332,8 +2362,6 @@ function viewReport() {
     ${runningOut()}
 
     ${findBox()}
-
-    ${closeBox()}
 
     <h2>Закрытые смены</h2>
     ${data.shifts.length === 0 ? '<p class="q">Пока ни одной. После закрытия смена появится здесь с итогом.</p>' : `
@@ -3022,7 +3050,9 @@ let retPick = {};
 /** Строка поиска чека. */
 let chkSearch = '';
 
-const checkNo = (c) => c.id.replace(/\D/g, '') || '1';
+const checkNo = (c) => String(c.no ?? (c.id.replace(/\D/g, '') || '1'));
+/** Следующий номер чека: по порядку, а не меткой времени — его диктуют покупателю. */
+const nextNo = () => data.checks.reduce((m, c) => Math.max(m, c.no ?? 0), 0) + 1;
 const lineLeft = (l) => l.qty - (l.ret ?? 0);
 const checkLeft = (c) => c.lines.reduce((s, l) => s + lineLeft(l), 0);
 /** Товар строки: по id, а у старых чеков, где его нет, — по названию. */
@@ -3032,6 +3062,12 @@ const lineGood = (l) => (l.id && good(l.id)) || data.goods.find((g) => g.name ==
  * У чехла код один на все штуки, и «коробкой» он не считается: такие
  * штуки возвращают счётчиком.
  */
+/** Коды строки, которые что-то значат для покупателя: IMEI штучного товара, а не общий штрих-код чехла. */
+const unitCodes = (l) => {
+  const g = lineGood(l);
+  const serial = g ? isSerial(g) : (l.codes ?? []).length > 1;
+  return serial ? (l.codes ?? []) : [];
+};
 const codesLeft = (l) => {
   const g = lineGood(l);
   const serial = g ? isSerial(g) : (l.codes ?? []).length > 1;
@@ -3145,10 +3181,8 @@ function sheetReceipt(id) {
         <tr><th>Наименование</th><th class="r">Кол-во</th><th class="r">Цена</th><th class="r">Сумма</th></tr>
         ${c.lines.map((l) => `<tr><td>${esc(l.name)}</td><td class="r">${l.qty}</td>
           <td class="r">${som(l.price)}</td><td class="r">${som(l.price * l.qty - l.off)}</td></tr>
-          ${(l.codes ?? []).length === 0 ? '' : `
-            <tr><td colspan="4" class="meta" style="padding-top:0">
-              ${l.codes.length > 1 ? 'коробки' : 'коробка'}: ${l.codes.map(esc).join(', ')}
-            </td></tr>`}
+          ${unitCodes(l).length === 0 ? '' : `
+            <tr><td colspan="4" class="meta" style="padding-top:0">IMEI: ${unitCodes(l).map(esc).join(', ')}</td></tr>`}
           ${(l.ret ?? 0) > 0 ? `<tr><td colspan="4" class="meta" style="padding-top:0">возвращено ${l.ret} шт</td></tr>` : ''}`).join('')}
         ${c.off ? `<tr><td colspan="3">Скидка</td><td class="r">${back ? '+' : '−'}${som(Math.abs(c.off))}</td></tr>` : ''}
         <tr><td colspan="3"><b>${back ? 'Вернули покупателю' : 'Итого'}</b></td><td class="r"><b>${som(Math.abs(c.total))}</b></td></tr>
@@ -3319,7 +3353,7 @@ function sell() {
     return { id: g.id, name: g.name, price: g.price, qty: l.qty, off: l.off, cost: g.cost, codes: l.codes ?? [] };
   });
 
-  const entry = { id, at, by: sellerName(), byId: owner() ? 'owner' : me().id,
+  const entry = { id, at, no: nextNo(), by: sellerName(), byId: owner() ? 'owner' : me().id,
     total: t.due, cost: t.cost, off: t.off, lines };
   data.checks.push(entry);
 
@@ -3520,7 +3554,7 @@ document.addEventListener('click', (event) => {
       return line;
     });
     c.refunded = (c.refunded ?? 0) + q.refund;
-    data.checks.push({ id, at, by: sellerName(), byId: owner() ? 'owner' : me().id, kind: 'return', of: c.id,
+    data.checks.push({ id, at, no: nextNo(), by: sellerName(), byId: owner() ? 'owner' : me().id, kind: 'return', of: c.id,
       total: -q.refund, cost: -q.cost, off: -(q.gross - q.refund), lines });
     retPick = {};
     sheet = { k: 'receipt', id };
@@ -3581,6 +3615,12 @@ document.addEventListener('click', (event) => {
     settle = true;
     if (sheet?.k === 'pick') sheet = null;
     return render();
+  }
+  // Телефону «+» не положен: новую трубку пикают, чтобы в чек попал её IMEI.
+  if (d.more) {
+    if (needName() || needOpen()) return;
+    if (!addLine(d.more)) return;
+    settle = true; return render();
   }
   if (d.less) {
     const l = check.find((x) => x.id === d.less);
@@ -3840,7 +3880,7 @@ document.addEventListener('click', (event) => {
     return;
   }
   if (el.id === 'reset') {
-    data = freshData();
+    data = numberChecks(freshData());
     if (pinned) data.role = pinned;
     check = []; sheet = null; search = ''; lastScan = null;
     save(); render();
