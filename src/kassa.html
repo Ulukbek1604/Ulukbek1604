@@ -1,0 +1,3080 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d3f6e" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111614" media="(prefers-color-scheme: dark)">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="Демонстрация учётной системы. Телефоны и чехлы.">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon-192.png">
+<style>
+  :root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  /* Цвет бизнеса: шапка, активный раздел, кнопка действия. */
+  :root { --brand: #1d3f6e; }
+  body { margin: 0; font: 14px system-ui, sans-serif; background: #e8e9e4; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<title>Телефоны и чехлы</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@400;500;600;700&display=swap">
+<style>
+  /* Касса магазина телефонов.
+     Место: прилавок со стеклянной витриной, холодный свет, ноутбук открыт
+     десять часов. Отсюда светлый холодный фон без бликов, волосяные линии
+     вместо карточек с тенями и единственная крупная вещь на экране — сумма.
+     Цифры набраны моноширинным: это показания прибора, они обязаны стоять
+     в столбик и читаться через прилавок. */
+  :root {
+    --glass:  #eef1f4;
+    --card:   #ffffff;
+    --sunk:   #e2e7ec;
+    --ink:    #0e1620;
+    --ink-2:  #51606e;
+    --ink-3:  #5f6e7c;
+    --line:   #d4dae1;
+    --edge:   #b9c3cd;
+
+    --brand:  #1d3f6e;
+    --on-brand: #ffffff;
+    --money:  #0b6b4f;
+    --cut:    #b4531a;
+    --alarm:  #b3261e;
+
+    /* Ряды графиков: себестоимость и прибыль. */
+    --mark-1: #2f6fb5;
+    --mark-2: #0f8a5f;
+    --grid:   #e3e8ed;
+
+    --ui:   'Fira Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --num:  'Fira Code', ui-monospace, 'Cascadia Mono', monospace;
+
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+    --r: 4px;
+    --tap: 44px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --glass:  #0f1419;
+      --card:   #161d24;
+      --sunk:   #0a0e12;
+      --ink:    #e9eef3;
+      --ink-2:  #9aa8b5;
+      --ink-3:  #93a1ae;
+      --line:   #263038;
+      --edge:   #37434d;
+      --brand:  #3f72b4;
+      --on-brand: #ffffff;
+      --money:  #3fb389;
+      --cut:    #e08a4d;
+      --alarm:  #e0655c;
+    --mark-1: #4a8ccc;
+    --mark-2: #2f9a73;
+    --grid:   #222b33;
+      --mark-1: #4a8ccc;
+      --mark-2: #2f9a73;
+      --grid:   #222b33;
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --glass:  #0f1419;
+    --card:   #161d24;
+    --sunk:   #0a0e12;
+    --ink:    #e9eef3;
+    --ink-2:  #9aa8b5;
+    --ink-3:  #93a1ae;
+    --line:   #263038;
+    --edge:   #37434d;
+    --brand:  #3f72b4;
+    --on-brand: #ffffff;
+    --money:  #3fb389;
+    --cut:    #e08a4d;
+    --alarm:  #e0655c;
+    --mark-1: #4a8ccc;
+    --mark-2: #2f9a73;
+    --grid:   #222b33;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--glass);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection { background: var(--brand); color: var(--on-brand); }
+  :where(input, textarea) { caret-color: var(--brand); }
+  * { scrollbar-width: thin; scrollbar-color: var(--edge) transparent; }
+  *::-webkit-scrollbar { width: 7px; height: 7px; }
+  *::-webkit-scrollbar-thumb { background: var(--edge); border-radius: 99px; }
+  :where(button, input, select, textarea, a):focus-visible {
+    outline: 2px solid var(--brand); outline-offset: 2px;
+  }
+
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input, select, textarea { font: inherit; color: inherit; }
+  svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Цифры — показания прибора. */
+  .n { font-family: var(--num); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+
+  /* -------------------------------------------------------------- каркас */
+  #app { display: flex; flex-direction: column; height: 100%; max-width: 520px; margin: 0 auto; }
+  #app.desk { max-width: 1180px; }
+
+  header.top { background: var(--brand); color: var(--on-brand); padding: var(--s3) var(--s4); flex: none; }
+  .toprow { display: flex; align-items: center; gap: var(--s3); min-height: 28px; }
+  .place { font-size: 16px; font-weight: 600; letter-spacing: -.01em; flex: 1; min-width: 0;
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .who { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.26); color: inherit;
+         border-radius: var(--r); padding: 5px 10px; font-size: 13px; font-weight: 500; }
+  /* Связь: продавец должен видеть, что касса жива и без интернета. */
+  .link { font-size: 12px; font-family: var(--num); padding: 3px 8px; border-radius: var(--r);
+          background: rgba(255,255,255,.14); color: var(--on-brand); white-space: nowrap; }
+  .link[data-down="1"] { background: var(--cut); }
+
+  /* Полоски из прошлой демонстрации здесь нет: витрина — не базарный тент. */
+  .band { display: none; }
+
+  main { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s4) var(--s4) var(--s6); }
+
+  nav { flex: none; display: flex; background: var(--card); border-top: 1px solid var(--line);
+        padding-bottom: env(safe-area-inset-bottom, 0px); }
+  nav button { flex: 1; background: none; border: 0; padding: var(--s2) var(--s1) var(--s3);
+               display: flex; flex-direction: column; align-items: center; gap: 3px;
+               font-size: 11.5px; font-weight: 500; color: var(--ink-3);
+               border-top: 2px solid transparent; margin-top: -1px; transition: color .15s; }
+  nav button[aria-selected="true"] { color: var(--brand); border-top-color: var(--brand); font-weight: 600; }
+  nav svg { width: 21px; height: 21px; }
+
+  h2 { font-size: 13px; font-weight: 600; letter-spacing: .01em; color: var(--ink-2);
+       margin: var(--s5) 0 var(--s2); padding-bottom: 5px; border-bottom: 1px solid var(--line); }
+  h2:first-child { margin-top: 0; }
+  p { margin: 0 0 var(--s2); }
+  .q  { color: var(--ink-2); font-size: 13.5px; }
+  .q2 { color: var(--ink-3); font-size: 12.5px; }
+  .hint { color: var(--ink-2); font-size: 13.5px; margin-bottom: var(--s4); max-width: 68ch; }
+
+  /* ----------------------------------------------- лента строк, без карточек */
+  .rows { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 0 var(--s3); }
+  .row { display: flex; align-items: center; gap: var(--s3); padding: 10px 0; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .t { font-size: 14.5px; font-weight: 500; }
+  .row .amt { font-family: var(--num); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ------------------------------------------------------------- товар */
+  .goods { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: var(--s2); }
+  .good {
+    text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+    padding: 10px; min-height: 82px; display: flex; flex-direction: column; gap: 3px;
+    transition: border-color .15s, background .15s;
+  }
+  .good:hover:not(:disabled) { border-color: var(--brand); }
+  .good:disabled { opacity: .45; cursor: not-allowed; }
+  .good .t { font-size: 13px; font-weight: 500; line-height: 1.3; }
+  .good .p { margin-top: auto; font-family: var(--num); font-size: 15px; font-weight: 700; }
+  .good .s { font-family: var(--num); font-size: 11.5px; color: var(--ink-3); }
+
+  /* -------------------------------------------------------------- чек */
+  .till { flex: none; background: var(--card); border-top: 1px solid var(--edge); padding: var(--s3) var(--s4); }
+  .till-head { display: flex; align-items: baseline; gap: var(--s3); }
+  .till-head .lines { flex: 1; min-width: 0; background: none; border: 0; padding: 0; text-align: left;
+                      color: var(--ink-2); font-size: 13px; }
+  .till-head .gross { font-family: var(--num); font-size: 14px; color: var(--ink-2); }
+  .till-head .gross.struck { text-decoration: line-through; text-decoration-color: var(--cut); }
+
+  .due { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s3); margin-top: var(--s2); }
+  .due .lbl { font-size: 13px; color: var(--ink-2); padding-bottom: 6px; }
+  .due .amt { font-family: var(--num); font-weight: 700; font-size: 40px; line-height: 1;
+              letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+  .due .amt.settle { animation: settle .28s cubic-bezier(.16, 1, .3, 1); }
+  @keyframes settle { from { opacity: .3; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .sell { display: flex; align-items: center; justify-content: center; gap: var(--s2);
+          width: 100%; min-height: 52px; margin-top: var(--s3);
+          border: 0; border-radius: var(--r); background: var(--brand); color: var(--on-brand);
+          font-size: 16px; font-weight: 600; transition: background .15s; }
+  .sell:hover { background: color-mix(in srgb, var(--brand) 86%, #000); }
+  .sell svg { width: 19px; height: 19px; }
+
+  /* ------------------------------------------------------------ кнопки */
+  .btn { display: flex; align-items: center; justify-content: center; gap: var(--s2); width: 100%;
+         min-height: var(--tap); border: 1px solid var(--brand); border-radius: var(--r);
+         background: var(--brand); color: var(--on-brand); font-size: 15px; font-weight: 600;
+         margin-top: var(--s3); transition: background .15s, border-color .15s; }
+  .btn:hover { background: color-mix(in srgb, var(--brand) 86%, #000); }
+  .btn.line { background: var(--card); color: var(--ink); border-color: var(--edge); }
+  .btn.line:hover { border-color: var(--brand); background: var(--card); }
+  .btn.warn { background: var(--alarm); border-color: var(--alarm); color: #fff; }
+  .btn[disabled] { opacity: .4; cursor: not-allowed; }
+  .btn svg { width: 17px; height: 17px; }
+
+  .cuts { display: flex; gap: 6px; }
+  .cut { flex: 1; min-height: var(--tap); border: 1px solid var(--edge); background: var(--card);
+         border-radius: var(--r); font-family: var(--num); font-size: 14px; font-weight: 500;
+         transition: background .15s, color .15s, border-color .15s; }
+  .cut:hover { border-color: var(--brand); }
+  .cut[aria-pressed="true"] { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+
+  .chipsrow { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chipx { border: 1px solid var(--edge); background: var(--card); color: var(--ink-2);
+           border-radius: var(--r); padding: 8px 12px; min-height: var(--tap);
+           font-family: var(--num); font-size: 14px; transition: border-color .15s; }
+  .chipx:hover { border-color: var(--cut); }
+  .chipx[aria-pressed="true"] { border-color: var(--cut); color: var(--cut); font-weight: 600;
+                                background: color-mix(in srgb, var(--cut) 8%, transparent); }
+
+  .stepper { display: flex; align-items: center; gap: 2px; }
+  .stepper button { width: 36px; height: 36px; border: 1px solid var(--edge); background: var(--card);
+                    border-radius: var(--r); display: grid; place-items: center; padding: 0; }
+  .stepper button:hover { border-color: var(--brand); }
+  .stepper button svg { width: 14px; height: 14px; }
+  .stepper .v { min-width: 28px; text-align: center; font-family: var(--num); font-weight: 600; }
+
+  .plain { background: none; border: 0; padding: 0; text-align: left; width: 100%; }
+  .less { width: 26px; height: 26px; border: 1px solid var(--edge); background: var(--card);
+          border-radius: var(--r); display: grid; place-items: center; padding: 0; flex: none; }
+  .less svg { width: 13px; height: 13px; }
+  .ok { width: 26px; height: 26px; border: 1px solid var(--edge); background: var(--card);
+        border-radius: var(--r); display: grid; place-items: center; padding: 0; flex: none; }
+  .ok[aria-pressed="true"] { background: var(--money); border-color: var(--money); color: #fff; }
+  .ok svg { width: 15px; height: 15px; stroke-width: 2.4; }
+
+  /* -------------------------------------------------------------- метки */
+  .tag { display: inline-flex; align-items: center; border-radius: var(--r); padding: 2px 7px;
+         font-size: 11.5px; font-weight: 600; white-space: nowrap; border: 1px solid;
+         /* Не сжимается и не ужимается до нуля: соседняя колонка с flex: 1
+            иначе забирает всю ширину, и длинная подпись обрезается. */
+         flex: none; min-width: max-content; }
+  .tag.ok { color: var(--money); border-color: color-mix(in srgb, var(--money) 40%, transparent);
+            background: color-mix(in srgb, var(--money) 8%, transparent); }
+  .tag.wt { color: var(--cut); border-color: color-mix(in srgb, var(--cut) 40%, transparent);
+            background: color-mix(in srgb, var(--cut) 8%, transparent); }
+  .tag.nt { color: var(--ink-2); border-color: var(--line); background: var(--sunk); }
+
+  /* ------------------------------------------------------------- итоги */
+  .figures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line);
+             border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .figure { background: var(--card); padding: 10px var(--s3); }
+  .figure b { display: block; font-family: var(--num); font-weight: 700; font-size: 18px;
+              letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .figure span { font-size: 11.5px; color: var(--ink-2); }
+
+  .ledger { margin-top: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--edge); }
+  .ledger div { display: flex; justify-content: space-between; gap: var(--s3); padding: 3px 0; }
+  .ledger .n { font-size: 14px; }
+  .ledger .big { font-family: var(--num); font-weight: 700; font-size: 26px; letter-spacing: -.035em;
+                 font-variant-numeric: tabular-nums; }
+  .ledger .off { color: var(--cut); font-weight: 600; }
+
+  /* -------------------------------------------------------------- поля */
+  .fld { display: block; margin-bottom: var(--s3); }
+  .fld > span { display: block; font-size: 12.5px; color: var(--ink-2); margin-bottom: 4px; }
+  /* Строка ввода рядом с кнопками-подсказками — тот же вид, что у полей. */
+  .fld input, .fld select, .fld textarea, input.plainfld {
+    width: 100%; background: var(--card); border: 1px solid var(--edge);
+    border-radius: var(--r); padding: 11px var(--s3); font-size: 16px;
+  }
+  .fld input:focus, .fld select:focus, .fld textarea:focus,
+  input.plainfld:focus { border-color: var(--brand); outline: none; }
+  .fld input[type="number"], .fld input.n { font-family: var(--num); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
+
+  .search { display: flex; align-items: center; gap: var(--s2); background: var(--card);
+            border: 1px solid var(--edge); border-radius: var(--r); padding: 0 var(--s3); margin-bottom: var(--s3); }
+  .search svg { color: var(--ink-3); flex: none; }
+  .search input { flex: 1; min-width: 0; border: 0; background: none; padding: 11px 0; font-size: 16px; }
+  .search input:focus { outline: none; }
+  .search .plain { width: auto; flex: none; color: var(--ink-3); display: grid; place-items: center; }
+
+  .filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  .pill-f { flex: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--edge);
+            background: var(--card); color: var(--ink-2); border-radius: var(--r);
+            padding: 7px 12px; font-size: 13px; font-weight: 500; white-space: nowrap; }
+  .pill-f span { font-family: var(--num); color: var(--ink-3); }
+  .pill-f[aria-pressed="true"] { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+  .pill-f[aria-pressed="true"] span { color: var(--on-brand); opacity: .75; }
+
+  /* ------------------------------------------------------------ сканер */
+  .scanbox { border: 1px dashed var(--edge); border-radius: var(--r); background: var(--card);
+             padding: var(--s5) var(--s4); text-align: center; }
+  .scanbox.live { border-style: solid; border-color: var(--money); }
+  .scanbox .big { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+  .scanbox .sub { color: var(--ink-2); font-size: 13px; margin-top: 3px; }
+  .scanbox svg { width: 30px; height: 30px; color: var(--ink-3); }
+  .scanbox.live svg { color: var(--money); }
+
+  /* -------------------------------------------------------------- листы */
+  .veil { position: fixed; inset: 0; z-index: 60; background: rgba(14, 22, 32, .5);
+          display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { width: 100%; max-width: 520px; max-height: 92%; overflow-y: auto; background: var(--glass);
+           border-radius: var(--r) var(--r) 0 0; border-top: 3px solid var(--brand);
+           padding: var(--s3) var(--s4) calc(var(--s5) + env(safe-area-inset-bottom, 0px)); }
+  .grip { width: 36px; height: 3px; border-radius: 99px; background: var(--edge); margin: 0 auto var(--s3); }
+  /* Кнопки под длинным списком: иначе до них надо прокручивать. */
+  .stick { position: sticky; bottom: calc(-1 * var(--s5)); background: var(--glass);
+           padding-top: var(--s3); margin-top: var(--s3); border-top: 1px solid var(--edge); }
+  .sheet h3 { font-size: 18px; font-weight: 600; letter-spacing: -.015em; margin: 0 0 var(--s3); }
+
+  /* ------------------------------------------------------------- бумага */
+  .sheetpaper { background: #fff; color: #16191a; border: 1px solid #d8dad6; border-radius: var(--r);
+                padding: var(--s4); font-size: 13px; line-height: 1.5; }
+  .sheetpaper h4 { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
+  .sheetpaper .meta { color: #6a706c; font-size: 11.5px; font-family: var(--num); }
+  .sheetpaper table { width: 100%; border-collapse: collapse; margin: var(--s3) 0;
+                      font-variant-numeric: tabular-nums; }
+  .sheetpaper th, .sheetpaper td { text-align: left; padding: 5px 4px; border-bottom: 1px solid #e7e9e6; }
+  .sheetpaper th { font-size: 11.5px; font-weight: 600; color: #6a706c; }
+  .sheetpaper .r { text-align: right; font-family: var(--num); }
+  .sheetpaper .sign { display: flex; gap: var(--s4); margin-top: var(--s5); font-size: 11.5px; color: #6a706c; }
+  .sheetpaper .sign > div { flex: 1; border-top: 1px solid #b9bdb9; padding-top: 4px; }
+
+  .aside { border-left: 2px solid var(--brand); background: var(--card); padding: 10px var(--s3);
+           font-size: 13px; color: var(--ink-2); border-radius: 0 var(--r) var(--r) 0; margin-top: var(--s3); }
+
+  .flash { position: fixed; left: var(--s4); right: var(--s4); z-index: 80; margin: 0 auto; max-width: 440px;
+           bottom: calc(var(--s4) + env(safe-area-inset-bottom, 0px));
+           background: var(--ink); color: var(--glass); border-radius: var(--r); padding: 12px var(--s3);
+           font-size: 14px; font-weight: 500; text-align: center; }
+
+  /* ------------------------------------------------------ за прилавком */
+  @media (min-width: 900px) {
+    .desk > header { order: 0; }
+    .desk > nav    { order: 1; border-top: 0; border-bottom: 1px solid var(--line); padding-bottom: 0;
+                     background: var(--card); }
+    .desk > main   { order: 2; padding: var(--s5) var(--s5) var(--s6); }
+    .desk > .till  { order: 3; display: none; }
+
+    .desk > nav button { flex: 0 0 auto; flex-direction: row; gap: 7px; padding: 11px 20px;
+                         font-size: 14px; border-top: 0; border-bottom: 2px solid transparent; margin-top: 0; }
+    .desk > nav button[aria-selected="true"] { border-bottom-color: var(--brand); }
+
+    .two-pane { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: var(--s5); align-items: start; }
+    .two-pane > * { min-width: 0; }
+    .pane-right { position: sticky; top: var(--s4); }
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  /* ------------------------------------------------------------ графики */
+  .chart { background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+           padding: var(--s3) var(--s3) var(--s2); position: relative; }
+  .chart h3 { font-size: 14px; font-weight: 600; margin: 0 0 2px; letter-spacing: -.01em; }
+  .chart .lead { color: var(--ink-2); font-size: 12.5px; margin: 0 0 var(--s3); }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+  /* Общее правило для значков задаёт обводку всем svg — графикам она
+     рисует лишние вертикальные линии по краям прямоугольников. */
+  .chart svg rect, .chart svg text { stroke: none; }
+  .chart .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .chart .axis { fill: var(--ink-3); font-size: 10.5px; font-family: var(--num); }
+  .chart .axis-name { fill: var(--ink-2); font-size: 11px; }
+  /* Зазор между долями столбца: без него они сливаются в одно пятно. */
+  .chart .seg { stroke: var(--card); stroke-width: 2; }
+  .chart .hit { fill: transparent; cursor: pointer; }
+  .chart .hit:hover ~ .cap, .chart .bar-group:hover .cap { opacity: 1; }
+  .chart .value { fill: var(--ink); font-size: 11px; font-weight: 600; font-family: var(--num); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+  .legend i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+
+  .tip { position: absolute; z-index: 5; pointer-events: none; background: var(--ink); color: var(--glass);
+         border-radius: var(--r); padding: 7px 9px; font-size: 12px; line-height: 1.4; white-space: nowrap;
+         transform: translate(-50%, -115%); opacity: 0; transition: opacity .1s; }
+  .tip.on { opacity: 1; }
+  .tip b { font-family: var(--num); }
+
+  /* --------------------------------------------------------------- вход */
+  .lock { position: fixed; inset: 0; z-index: 90; background: var(--glass);
+          display: grid; place-items: center; padding: var(--s4); }
+  .lock-card { width: 100%; max-width: 360px; text-align: center; }
+  .lock-card h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; letter-spacing: -.02em; }
+  .lock-card p { color: var(--ink-2); font-size: 13.5px; margin: 0 0 var(--s5); }
+  .lock-who { display: flex; gap: var(--s2); margin-bottom: var(--s4); }
+  .lock-who button { flex: 1; min-height: 52px; border: 1px solid var(--edge); background: var(--card);
+                     border-radius: var(--r); font-size: 15px; font-weight: 500; }
+  .lock-who button[aria-pressed="true"] { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+  .pin { display: flex; justify-content: center; gap: var(--s2); margin-bottom: var(--s4); }
+  .pin i { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--edge); display: block; }
+  .pin i[data-on="1"] { background: var(--brand); border-color: var(--brand); }
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
+  .keys button { min-height: 58px; border: 1px solid var(--edge); background: var(--card);
+                 border-radius: var(--r); font-family: var(--num); font-size: 21px; font-weight: 500; }
+  .keys button:hover { border-color: var(--brand); }
+  .keys button.wide { grid-column: span 1; font-family: var(--ui); font-size: 14px; }
+</style>
+
+<script>
+/**
+ * Три недели продаж задним числом.
+ *
+ * Выдумано, но по правилам живого магазина: к вечеру оживлённее,
+ * в выходные больше, телефон берут редко и дорого, мелочь — часто
+ * и помногу. Числа повторяемые: иначе графики прыгали бы при каждом
+ * открытии и верить им было бы нельзя.
+ */
+function makeHistory() {
+  let seed = 20261003;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const pick = (list) => list[Math.floor(rnd() * list.length)];
+
+  const phones = ['g1', 'g2', 'g3'];
+  const small = ['g4', 'g5', 'g6', 'g7', 'g8', 'g9', 'g10'];
+  const out = [];
+
+  for (let back = 21; back >= 1; back -= 1) {
+    const day = new Date();
+    day.setDate(day.getDate() - back);
+    const weekend = day.getDay() === 0 || day.getDay() === 6;
+    const count = Math.round((weekend ? 9 : 6) + rnd() * 5);
+
+    for (let i = 0; i < count; i += 1) {
+      // Торговля идёт с десяти до восьми, под вечер плотнее.
+      const hour = 10 + Math.floor(Math.pow(rnd(), 0.75) * 10);
+      const at = new Date(day);
+      at.setHours(hour, Math.floor(rnd() * 60), 0, 0);
+
+      const want = [];
+      if (rnd() < 0.22) want.push(pick(phones));
+      const extras = 1 + Math.floor(rnd() * 2);
+      for (let k = 0; k < extras; k += 1) want.push(pick(small));
+
+      let total = 0;
+      let cost = 0;
+      let off = 0;
+      const lines = [];
+
+      for (const id of [...new Set(want)]) {
+        const g = SEED.goods.find((x) => x.id === id);
+        const qty = small.includes(id) && rnd() < 0.3 ? 2 : 1;
+        // Скидку дают на дорогое, на мелочь — редко.
+        const cut = phones.includes(id) && rnd() < 0.5
+          ? Math.round((300 + rnd() * 1700) / 50) * 50
+          : rnd() < 0.12 ? 50 : 0;
+        lines.push({ name: g.name, price: g.price, qty, off: cut });
+        total += g.price * qty - cut;
+        cost += g.cost * qty;
+        off += cut;
+      }
+
+      out.push({
+        id: `h${back}-${i}`,
+        at: at.getTime(),
+        by: rnd() < 0.7 ? 'Кассир' : 'Владелец',
+        total,
+        cost,
+        off,
+        lines,
+      });
+    }
+  }
+
+  return out.sort((a, b) => a.at - b.at);
+}
+
+</script>
+<script>
+/**
+ * Графики отчёта.
+ *
+ * Рисуются своим кодом в SVG, без библиотек: три простые формы не стоят
+ * ста килобайт зависимости, которую потом нельзя открыть без интернета.
+ *
+ * Цвета рядов проверены скриптом на различимость при дальтонизме,
+ * контраст с фоном и полосу светлоты — в обеих темах. Доли столбца
+ * дополнительно разделены зазором и всегда лежат в одном порядке:
+ * цвет здесь не единственный признак.
+ */
+
+const PLOT = { w: 760, h: 200, top: 16, right: 8, bottom: 26, left: 52 };
+
+const money0 = (v) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Math.round(v));
+
+/** Короткая подпись оси: 12 400 → 12 т. */
+function tick(v) {
+  if (v >= 1000) return `${Math.round(v / 1000)} т`;
+  return String(Math.round(v));
+}
+
+/**
+ * Верхняя граница шкалы: круглое число над максимумом и обязательно
+ * кратное четырём делениям — иначе подписи выходят вроде «188 т»,
+ * по которым ничего не прикинешь на глаз.
+ */
+function ceilNice(max) {
+  if (max <= 0) return 4;
+  const order = Math.pow(10, Math.floor(Math.log10(max / 4)));
+  for (const mult of [1, 2, 2.5, 5, 10]) {
+    const step = order * mult;
+    if (step * 4 >= max) return step * 4;
+  }
+  return order * 40;
+}
+
+function axisY(max, w, h, top, left) {
+  const lines = [];
+  for (let i = 0; i <= 4; i += 1) {
+    const value = (max / 4) * i;
+    const y = top + h - (h * i) / 4;
+    lines.push(`<line class="grid-line" x1="${left}" y1="${y}" x2="${left + w}" y2="${y}"/>`);
+    lines.push(`<text class="axis" x="${left - 8}" y="${y + 3.5}" text-anchor="end">${tick(value)}</text>`);
+  }
+  return lines.join('');
+}
+
+/**
+ * Выручка по дням, столбец разложен на себестоимость и прибыль.
+ *
+ * Высота столбца — выручка, верхняя доля — то, что осталось магазину.
+ * Две линии вместо этого показали бы те же числа, но спрятали главное:
+ * прибыль — часть выручки, а не отдельная величина.
+ */
+function chartDays(checks, days = 14) {
+  const buckets = [];
+  for (let back = days - 1; back >= 0; back -= 1) {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - back);
+    const next = d.getTime() + 24 * 3600e3;
+    const inDay = checks.filter((c) => c.at >= d.getTime() && c.at < next);
+    buckets.push({
+      date: d,
+      revenue: inDay.reduce((s, c) => s + c.total, 0),
+      cost: inDay.reduce((s, c) => s + c.cost, 0),
+      count: inDay.length,
+    });
+  }
+
+  const max = ceilNice(Math.max(...buckets.map((b) => b.revenue), 1));
+  const { w, h, top, left, bottom } = PLOT;
+  const plotW = w - left - PLOT.right;
+  const band = plotW / buckets.length;
+  const barW = Math.min(26, band * 0.62);
+
+  const bars = buckets.map((b, i) => {
+    const x = left + band * i + (band - barW) / 2;
+    const hCost = (b.cost / max) * h;
+    const hProfit = ((b.revenue - b.cost) / max) * h;
+    const yCost = top + h - hCost;
+    const yProfit = yCost - hProfit;
+    const label = b.date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+
+    return `<g class="bar-group"
+      data-tip="${label}: выручка ${money0(b.revenue)} с, прибыль ${money0(b.revenue - b.cost)} с, чеков ${b.count}">
+      ${hProfit > 0.5 ? `<rect class="seg" x="${x}" y="${yProfit}" width="${barW}" height="${hProfit}"
+        rx="3" fill="var(--mark-2)"/>` : ''}
+      ${hCost > 0.5 ? `<rect class="seg" x="${x}" y="${yCost}" width="${barW}" height="${hCost}"
+        fill="var(--mark-1)"/>` : ''}
+      <rect class="hit" x="${left + band * i}" y="${top}" width="${band}" height="${h}"/>
+    </g>`;
+  }).join('');
+
+  // Подписи по оси времени не на каждом столбце: иначе они сольются.
+  const marks = buckets.map((b, i) => {
+    const every = buckets.length > 10 ? 3 : 1;
+    if (i % every !== 0 && i !== buckets.length - 1) return '';
+    const x = left + band * i + band / 2;
+    return `<text class="axis" x="${x}" y="${top + h + 16}" text-anchor="middle">${
+      b.date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}</text>`;
+  }).join('');
+
+  return `
+    <div class="chart">
+      <h3>Выручка по дням</h3>
+      <p class="lead">Высота столбца — выручка за день. Зелёным сверху — что осталось магазину.</p>
+      <svg viewBox="0 0 ${w} ${h + top + bottom}" role="img"
+           aria-label="Выручка и прибыль по дням за ${days} дней">
+        ${axisY(max, w - left - PLOT.right, h, top, left)}
+        ${bars}
+        ${marks}
+      </svg>
+      <div class="legend">
+        <span><i style="background:var(--mark-2)"></i>прибыль</span>
+        <span><i style="background:var(--mark-1)"></i>себестоимость</span>
+      </div>
+    </div>`;
+}
+
+/** Когда в магазин заходят: по этому графику ставят людей в смену. */
+function chartHours(checks) {
+  const from = 9;
+  const to = 21;
+  const hours = [];
+  for (let hour = from; hour <= to; hour += 1) {
+    const inHour = checks.filter((c) => new Date(c.at).getHours() === hour);
+    hours.push({ hour, count: inHour.length, sum: inHour.reduce((s, c) => s + c.total, 0) });
+  }
+
+  const max = ceilNice(Math.max(...hours.map((x) => x.count), 1));
+  const h = 140;
+  const top = 14;
+  const left = 38;
+  const w = PLOT.w;
+  const plotW = w - left - PLOT.right;
+  const band = plotW / hours.length;
+  const barW = Math.min(30, band * 0.66);
+  const busiest = hours.reduce((a, b) => (b.count > a.count ? b : a), hours[0]);
+
+  const bars = hours.map((x, i) => {
+    const bh = (x.count / max) * h;
+    const bx = left + band * i + (band - barW) / 2;
+    const by = top + h - bh;
+    return `<g class="bar-group" data-tip="${x.hour}:00 — ${x.count} чеков на ${money0(x.sum)} с">
+      ${bh > 0.5 ? `<rect class="seg" x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="3"
+        fill="var(--mark-1)" opacity="${x.hour === busiest.hour ? 1 : 0.72}"/>` : ''}
+      ${x.hour === busiest.hour
+        ? `<text class="value" x="${bx + barW / 2}" y="${by - 6}" text-anchor="middle">${x.count}</text>`
+        : ''}
+      <rect class="hit" x="${left + band * i}" y="${top}" width="${band}" height="${h}"/>
+    </g>`;
+  }).join('');
+
+  const marks = hours.map((x, i) => (x.hour % 2 === 0
+    ? `<text class="axis" x="${left + band * i + band / 2}" y="${top + h + 16}" text-anchor="middle">${x.hour}</text>`
+    : '')).join('');
+
+  return `
+    <div class="chart">
+      <h3>Когда покупают</h3>
+      <p class="lead">Чеков по часам за три недели. Самый плотный час подписан.</p>
+      <svg viewBox="0 0 ${w} ${h + top + 26}" role="img" aria-label="Число чеков по часам">
+        ${axisY(max, plotW, h, top, left)}
+        ${bars}
+        ${marks}
+        <text class="axis-name" x="${left}" y="${top + h + 26}">час дня</text>
+      </svg>
+    </div>`;
+}
+
+/** Что берут: выручка по товарам, полосами вниз по убыванию. */
+function chartTop(checks, limit = 6) {
+  const sums = new Map();
+  for (const c of checks) {
+    for (const l of c.lines) {
+      const prev = sums.get(l.name) ?? { sum: 0, qty: 0 };
+      sums.set(l.name, { sum: prev.sum + l.price * l.qty - l.off, qty: prev.qty + l.qty });
+    }
+  }
+  const rows = [...sums.entries()]
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.sum - a.sum)
+    .slice(0, limit);
+
+  if (rows.length === 0) return '';
+
+  const max = Math.max(...rows.map((r) => r.sum));
+  const rowH = 30;
+  const left = 0;
+  const w = PLOT.w;
+  const barLeft = 230;
+  const barW = w - barLeft - 90;
+
+  const bars = rows.map((r, i) => {
+    const y = i * rowH;
+    const len = Math.max(2, (r.sum / max) * barW);
+    return `<g class="bar-group" data-tip="${r.name}: ${r.qty} шт на ${money0(r.sum)} с">
+      <text class="axis" x="${left}" y="${y + 19}" style="font-family:var(--ui);fill:var(--ink)">${
+        r.name.length > 26 ? r.name.slice(0, 25) + '…' : r.name}</text>
+      <rect x="${barLeft}" y="${y + 8}" width="${len}" height="14" rx="3" fill="var(--mark-1)"/>
+      <text class="value" x="${barLeft + len + 8}" y="${y + 19}">${money0(r.sum)}</text>
+      <rect class="hit" x="0" y="${y}" width="${w}" height="${rowH}"/>
+    </g>`;
+  }).join('');
+
+  return `
+    <div class="chart">
+      <h3>Что берут</h3>
+      <p class="lead">Выручка по товару за три недели.</p>
+      <svg viewBox="0 0 ${w} ${rows.length * rowH + 6}" role="img" aria-label="Выручка по товарам">
+        ${bars}
+      </svg>
+    </div>`;
+}
+
+/**
+ * Подсказка при наведении.
+ *
+ * Одна на весь отчёт: вешать обработчик на каждый столбец значит
+ * пересоздавать их при каждой перерисовке.
+ */
+function wireTips(host) {
+  if (!host) return;
+  let tip = host.querySelector('.tip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.className = 'tip';
+    host.appendChild(tip);
+  }
+
+  host.addEventListener('pointermove', (event) => {
+    const group = event.target.closest('[data-tip]');
+    if (!group) { tip.classList.remove('on'); return; }
+    const box = host.getBoundingClientRect();
+    tip.textContent = group.dataset.tip;
+    tip.style.left = `${event.clientX - box.left}px`;
+    tip.style.top = `${event.clientY - box.top - 6}px`;
+    tip.classList.add('on');
+  });
+
+  host.addEventListener('pointerleave', () => tip.classList.remove('on'));
+}
+
+</script>
+<script>
+/**
+ * Запись книги Excel.
+ *
+ * Своим кодом, без библиотек: файл .xlsx — это обычный zip с несколькими
+ * файлами XML внутри, и складывать его без сжатия Excel разрешает.
+ * Тянуть ради этого стороннюю библиотеку значило бы прибавить к странице
+ * сотню килобайт и внешнюю загрузку, которой в офлайне не будет.
+ *
+ * Числа кладутся числами, а не строками: иначе в Excel по колонке не
+ * посчитать сумму, и выгрузка превращается в картинку таблицы.
+ */
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n += 1) {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let c = 0xffffffff;
+  for (const byte of bytes) c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/** Zip без сжатия: короче кода и Excel такой читает. */
+function zip(files) {
+  const encoder = new TextEncoder();
+  const parts = [];
+  const central = [];
+  let offset = 0;
+
+  const u16 = (v) => [v & 255, (v >> 8) & 255];
+  const u32 = (v) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+
+  for (const { name, text } of files) {
+    const nameBytes = encoder.encode(name);
+    const body = encoder.encode(text);
+    const sum = crc32(body);
+
+    const local = [
+      ...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(sum), ...u32(body.length), ...u32(body.length),
+      ...u16(nameBytes.length), ...u16(0),
+    ];
+    parts.push(new Uint8Array(local), nameBytes, body);
+
+    central.push([
+      ...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(sum), ...u32(body.length), ...u32(body.length),
+      ...u16(nameBytes.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(0), ...u32(offset),
+      ...Array.from(nameBytes),
+    ]);
+
+    offset += local.length + nameBytes.length + body.length;
+  }
+
+  const dir = central.flat();
+  const end = [
+    ...u32(0x06054b50), ...u16(0), ...u16(0),
+    ...u16(files.length), ...u16(files.length),
+    ...u32(dir.length), ...u32(offset), ...u16(0),
+  ];
+
+  const total = offset + dir.length + end.length;
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const part of parts) { out.set(part, at); at += part.length; }
+  out.set(new Uint8Array(dir), at); at += dir.length;
+  out.set(new Uint8Array(end), at);
+  return out;
+}
+
+const xmlText = (v) => String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const colName = (i) => (i < 26 ? String.fromCharCode(65 + i) : String.fromCharCode(64 + Math.floor(i / 26)) + String.fromCharCode(65 + (i % 26)));
+
+/**
+ * Лист книги.
+ * rows — массив массивов; число остаётся числом, остальное становится текстом.
+ * Первая строка считается шапкой и выделяется жирным.
+ */
+function sheetXml(rows, widths) {
+  const body = rows.map((row, r) => {
+    const cells = row.map((value, c) => {
+      const ref = `${colName(c)}${r + 1}`;
+      const style = r === 0 ? ' s="1"' : '';
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return `<c r="${ref}"${style}><v>${value}</v></c>`;
+      }
+      return `<c r="${ref}"${style} t="inlineStr"><is><t xml:space="preserve">${xmlText(value ?? '')}</t></is></c>`;
+    }).join('');
+    return `<row r="${r + 1}">${cells}</row>`;
+  }).join('');
+
+  const cols = (widths ?? []).map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+${cols ? `<cols>${cols}</cols>` : ''}
+<sheetData>${body}</sheetData>
+</worksheet>`;
+}
+
+/** Собирает книгу из листов вида { name, rows, widths }. */
+function makeWorkbook(sheets) {
+  const files = [
+    {
+      name: '[Content_Types].xml',
+      text: `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+${sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}
+</Types>`,
+    },
+    {
+      name: '_rels/.rels',
+      text: `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`,
+    },
+    {
+      name: 'xl/workbook.xml',
+      text: `<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets>${sheets.map((s, i) => `<sheet name="${xmlText(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>
+</workbook>`,
+    },
+    {
+      name: 'xl/_rels/workbook.xml.rels',
+      text: `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}
+<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`,
+    },
+    {
+      // Два оформления: обычное и жирное для шапки.
+      name: 'xl/styles.xml',
+      text: `<?xml version="1.0" encoding="UTF-8"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
+<fills count="1"><fill><patternFill patternType="none"/></fill></fills>
+<borders count="1"><border/></borders>
+<cellStyleXfs count="1"><xf/></cellStyleXfs>
+<cellXfs count="2"><xf xfId="0"/><xf xfId="0" fontId="1" applyFont="1"/></cellXfs>
+</styleSheet>`,
+    },
+  ];
+
+  sheets.forEach((s, i) => {
+    files.push({ name: `xl/worksheets/sheet${i + 1}.xml`, text: sheetXml(s.rows, s.widths) });
+  });
+
+  return zip(files);
+}
+
+</script>
+<script>
+/**
+ * Разбор торговли: что брать больше, что меньше, где лежат деньги.
+ *
+ * Все выводы — из чеков за три недели, и каждый подкреплён числом.
+ * Совет без числа в рознице бесполезен: «берите больше чехлов» ничего
+ * не говорит, а «чехлов хватит на четыре дня, берут по две штуки в день»
+ * говорит, сколько заказать.
+ */
+
+const WINDOW_DAYS = 21;
+
+/** Сводка по каждому товару за окно наблюдения. */
+function goodsStats() {
+  const since = Date.now() - WINDOW_DAYS * 24 * 3600e3;
+  const sold = new Map();
+
+  for (const check of data.checks) {
+    if (check.at < since) continue;
+    for (const line of check.lines) {
+      const prev = sold.get(line.name) ?? { qty: 0, revenue: 0, off: 0 };
+      sold.set(line.name, {
+        qty: prev.qty + line.qty,
+        revenue: prev.revenue + line.price * line.qty - line.off,
+        off: prev.off + line.off,
+      });
+    }
+  }
+
+  return data.goods.map((g) => {
+    const s = sold.get(g.name) ?? { qty: 0, revenue: 0, off: 0 };
+    const perDay = s.qty / WINDOW_DAYS;
+    const profit = s.qty * (g.price - g.cost) - s.off;
+    return {
+      good: g,
+      qty: s.qty,
+      revenue: s.revenue,
+      profit,
+      perDay,
+      // На сколько дней хватит остатка при нынешнем спросе.
+      daysLeft: perDay > 0 ? Math.floor(g.stock / perDay) : null,
+      markup: g.cost > 0 ? Math.round(((g.price - g.cost) / g.cost) * 100) : 0,
+      frozen: g.cost * g.stock,
+    };
+  });
+}
+
+/**
+ * Выводы.
+ *
+ * Правила намеренно простые и проверяемые: каждое объясняется одной
+ * фразой и опирается на видимое число. Сложная модель в демонстрации
+ * выглядела бы умно и не позволяла бы спорить.
+ */
+function advice() {
+  const rows = goodsStats();
+  const sellers = rows.filter((r) => r.qty > 0);
+  const totalProfit = rows.reduce((s, r) => s + r.profit, 0);
+  const avgMarkup = sellers.length
+    ? Math.round(sellers.reduce((s, r) => s + r.markup, 0) / sellers.length)
+    : 0;
+
+  const out = [];
+
+  // 1. Кончается то, что хорошо берут.
+  for (const r of rows
+    .filter((r) => r.daysLeft !== null && r.daysLeft <= 7)
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, 3)) {
+    const order = Math.max(1, Math.ceil(r.perDay * 14 - r.good.stock));
+    out.push({
+      kind: 'take',
+      name: r.good.name,
+      head: r.daysLeft === 0 ? 'Кончился, а берут' : `Хватит на ${r.daysLeft} ${plural(r.daysLeft, 'день', 'дня', 'дней')}`,
+      why: `берут ${r.perDay >= 1 ? r.perDay.toFixed(1) : r.perDay.toFixed(2)} шт в день, на складе ${r.good.stock}`,
+      what: `взять примерно ${order} шт — хватит на две недели`,
+    });
+  }
+
+  // 2. Деньги, которые лежат без движения.
+  for (const r of rows
+    .filter((r) => r.qty === 0 && r.frozen >= 1000)
+    .sort((a, b) => b.frozen - a.frozen)
+    .slice(0, 3)) {
+    out.push({
+      kind: 'drop',
+      name: r.good.name,
+      head: 'Не продаётся совсем',
+      why: `ни одной продажи за три недели, в остатке ${r.good.stock} шт`,
+      what: `в нём лежит ${som(r.frozen)} — распродать со скидкой и больше не брать`,
+    });
+  }
+
+  // 3. Берут часто, а зарабатываем мало — цена занижена.
+  const busy = [...sellers].sort((a, b) => b.qty - a.qty).slice(0, 4);
+  for (const r of busy.filter((r) => r.markup < avgMarkup && r.qty >= 5).slice(0, 2)) {
+    const plus = Math.round(r.good.cost * 0.1);
+    out.push({
+      kind: 'price',
+      name: r.good.name,
+      head: 'Берут охотно, наценка ниже средней',
+      why: `наценка ${r.markup}% против ${avgMarkup}% в среднем, продано ${r.qty} шт`,
+      what: `поднять цену примерно на ${som(plus)} — спрос такое обычно выдерживает`,
+    });
+  }
+
+  // 4. Наценка большая, а не берут — возможно, дорого.
+  for (const r of rows
+    .filter((r) => r.markup > avgMarkup * 1.5 && r.qty <= 1 && r.good.stock > 0)
+    .sort((a, b) => b.markup - a.markup)
+    .slice(0, 2)) {
+    out.push({
+      kind: 'slow',
+      name: r.good.name,
+      head: 'Наценка высокая, продаж почти нет',
+      why: `наценка ${r.markup}%, за три недели продано ${r.qty} шт`,
+      what: 'попробовать цену ниже: лучше заработать меньше, чем не заработать вовсе',
+    });
+  }
+
+  // 5. На чём держится заработок.
+  const top = [...sellers].sort((a, b) => b.profit - a.profit).slice(0, 3);
+  if (top.length && totalProfit > 0) {
+    const share = Math.round((top.reduce((s, r) => s + r.profit, 0) / totalProfit) * 100);
+    out.push({
+      kind: 'keep',
+      name: top.map((r) => r.good.name).join(', '),
+      head: `Эти три дают ${share}% всей прибыли`,
+      why: top.map((r) => `${r.good.name.split(' ')[0]} ${som(r.profit)}`).join(', '),
+      what: 'их нельзя допускать до нуля на складе — именно на них магазин живёт',
+    });
+  }
+
+  return { rows, out, avgMarkup, totalProfit };
+}
+
+const ADVICE_LOOK = {
+  take: { tag: 'wt', label: 'брать больше' },
+  drop: { tag: 'nt', label: 'не брать' },
+  price: { tag: 'ok', label: 'поднять цену' },
+  slow: { tag: 'nt', label: 'снизить цену' },
+  keep: { tag: 'ok', label: 'держать всегда' },
+};
+
+function viewAdvice() {
+  const { out, avgMarkup } = advice();
+  if (out.length === 0) {
+    return '<h2>Что делать</h2><p class="q">Пока продаж мало — советовать не на чем.</p>';
+  }
+
+  return `
+    <h2>Что делать</h2>
+    <p class="q">Выводы из чеков за три недели. Средняя наценка по магазину — ${avgMarkup}%.</p>
+    <div class="rows">
+      ${out.map((a) => {
+        const look = ADVICE_LOOK[a.kind];
+        return `<div class="row" style="align-items:flex-start">
+          <div class="grow">
+            <div class="t">${esc(a.head)}</div>
+            <div class="q2" style="margin:2px 0 4px">${esc(a.name)}</div>
+            <div class="q2">${esc(a.why)}</div>
+            <div class="t" style="font-weight:500;margin-top:4px">${esc(a.what)}</div>
+          </div>
+          <span class="tag ${look.tag}">${look.label}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+/* ------------------------------------------------------------- выгрузка */
+
+/** Книга Excel со всем, что есть в системе. */
+function buildWorkbook() {
+  const { rows, out, avgMarkup } = advice();
+  const checks = [...data.checks].sort((a, b) => a.at - b.at);
+  const day = (ms) => new Date(ms).toLocaleDateString('ru-RU');
+  const time = (ms) => new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+  const revenue = checks.reduce((s, c) => s + c.total, 0);
+  const cost = checks.reduce((s, c) => s + c.cost, 0);
+
+  const summary = [
+    ['Отчёт магазина «Телефоны и чехлы»'],
+    ['Составлен', new Date().toLocaleString('ru-RU')],
+    ['Период', `${day(checks[0]?.at ?? Date.now())} — ${day(checks.at(-1)?.at ?? Date.now())}`],
+    [],
+    ['Показатель', 'Значение'],
+    ['Выручка, сом', revenue],
+    ['Себестоимость проданного, сом', cost],
+    ['Прибыль, сом', revenue - cost],
+    ['Скидок дано, сом', checks.reduce((s, c) => s + c.off, 0)],
+    ['Чеков', checks.length],
+    ['Средний чек, сом', checks.length ? Math.round(revenue / checks.length) : 0],
+    ['Средняя наценка, %', avgMarkup],
+    ['Денег в товаре по закупу, сом', data.goods.reduce((s, g) => s + g.cost * g.stock, 0)],
+    [],
+    ['Что делать', 'Товар', 'Почему', 'Что именно'],
+    ...out.map((a) => [ADVICE_LOOK[a.kind].label, a.name, a.why, a.what]),
+  ];
+
+  const goods = [
+    ['Товар', 'Коды коробок', 'Закуп', 'Продажа', 'Наценка, %', 'Остаток',
+     'Продано за 21 день', 'В день', 'Хватит на, дней', 'Выручка', 'Прибыль', 'Денег в остатке'],
+    ...rows
+      .sort((a, b) => b.profit - a.profit)
+      .map((r) => [
+        // Кодов у товара много — у телефонов свой на каждой коробке.
+        // В книгу идут все: по ним потом находят, какая трубка ушла.
+        r.good.name, (r.good.codes ?? []).join(' '), r.good.cost, r.good.price, r.markup, r.good.stock,
+        r.qty, Number(r.perDay.toFixed(2)),
+        r.daysLeft === null ? 'спроса нет' : r.daysLeft,
+        r.revenue, r.profit, r.frozen,
+      ]),
+  ];
+
+  const sales = [
+    ['Дата', 'Время', 'Продал', 'Позиций', 'Сумма', 'Скидка', 'Себестоимость', 'Прибыль'],
+    ...checks.map((c) => [
+      day(c.at), time(c.at), c.by, c.lines.length, c.total, c.off, c.cost, c.total - c.cost,
+    ]),
+  ];
+
+  const lines = [
+    ['Дата', 'Время', 'Товар', 'Кол-во', 'Цена', 'Скидка', 'Сумма'],
+    ...checks.flatMap((c) => c.lines.map((l) => [
+      day(c.at), time(c.at), l.name, l.qty, l.price, l.off, l.price * l.qty - l.off,
+    ])),
+  ];
+
+  const byDay = new Map();
+  for (const c of checks) {
+    const key = day(c.at);
+    const prev = byDay.get(key) ?? { count: 0, revenue: 0, cost: 0, off: 0 };
+    byDay.set(key, {
+      count: prev.count + 1, revenue: prev.revenue + c.total,
+      cost: prev.cost + c.cost, off: prev.off + c.off,
+    });
+  }
+  const days = [
+    ['Дата', 'Чеков', 'Выручка', 'Себестоимость', 'Прибыль', 'Скидки'],
+    ...[...byDay.entries()].map(([d, v]) => [d, v.count, v.revenue, v.cost, v.revenue - v.cost, v.off]),
+  ];
+
+  const byHour = new Map();
+  for (const c of checks) {
+    const h = new Date(c.at).getHours();
+    const prev = byHour.get(h) ?? { count: 0, revenue: 0 };
+    byHour.set(h, { count: prev.count + 1, revenue: prev.revenue + c.total });
+  }
+  const hours = [
+    ['Час', 'Чеков', 'Выручка'],
+    ...[...byHour.entries()].sort((a, b) => a[0] - b[0]).map(([h, v]) => [`${h}:00`, v.count, v.revenue]),
+  ];
+
+  return makeWorkbook([
+    { name: 'Сводка', rows: summary, widths: [34, 16, 52, 52] },
+    { name: 'Товары', rows: goods, widths: [30, 16, 10, 10, 11, 9, 18, 9, 15, 12, 12, 15] },
+    { name: 'Продажи', rows: sales, widths: [12, 9, 12, 10, 12, 10, 15, 12] },
+    { name: 'Позиции чеков', rows: lines, widths: [12, 9, 30, 9, 11, 10, 12] },
+    { name: 'По дням', rows: days, widths: [12, 9, 12, 15, 12, 10] },
+    { name: 'По часам', rows: hours, widths: [9, 9, 12] },
+  ]);
+}
+
+/**
+ * Отдать книгу человеку.
+ *
+ * В программе на компьютере — положить файлом рядом с данными и открыть
+ * папку. В браузере — обычной ссылкой на скачивание.
+ */
+function exportWorkbook() {
+  const bytes = buildWorkbook();
+  const stamp = new Date().toISOString().slice(0, 10);
+  const name = `Отчёт магазина ${stamp}.xlsx`;
+
+  if (typeof DESK !== 'undefined' && DESK && DESK.saveFile) {
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    const where = DESK.saveFile(name, btoa(binary));
+    return where ? { ok: true, where } : { ok: false };
+  }
+
+  try {
+    const blob = new Blob([bytes], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    return { ok: true, where: name };
+  } catch (error) {
+    return { ok: false };
+  }
+}
+
+</script>
+<div id="app" class="desk">
+  <header class="top">
+    <div class="toprow">
+      <span class="place">Телефоны и чехлы</span>
+      <span class="link" id="link" title="Связь с интернетом"></span>
+      <span class="who" id="who">Владелец</span>
+    </div>
+    <div class="band" aria-hidden="true"></div>
+  </header>
+
+  <main id="screen"></main>
+
+  <section class="till" id="till" hidden></section>
+
+  <nav id="nav"></nav>
+</div>
+
+<div id="lock"></div>
+<div id="sheet"></div>
+<div id="flash"></div>
+
+<script>
+'use strict';
+
+const ICON = {
+  plus:  '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  check: '<path d="m4 12.5 5 5L20 6.5"/>',
+  cross: '<path d="M6 6l12 12M18 6L6 18"/>',
+  scan:  '<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M7.5 9v6M10 9v6M12.5 9v6M15 9v6M17 9v6"/>',
+  bag:   '<path d="M4 7h16l-1.3 11.1A2 2 0 0 1 16.7 20H7.3a2 2 0 0 1-2-1.9L4 7Z"/><path d="M9 7V5.5a3 3 0 0 1 6 0V7"/>',
+  box:   '<path d="M3 8.4 12 4l9 4.4-9 4.4-9-4.4Z"/><path d="M3 15.6 12 20l9-4.4"/><path d="M12 12.8V20"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  tag:   '<path d="M4 12.5V5a1 1 0 0 1 1-1h7.5L20 11.5 12.5 19 4 12.5Z"/><circle cx="8.5" cy="8.5" r="1.3"/>',
+  paper: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/>',
+  people:'<circle cx="9.5" cy="8" r="3"/><path d="M4 19a5.5 5.5 0 0 1 11 0"/><path d="M17.5 11h4M19.5 9v4"/>',
+};
+const svg = (n, size) => `<svg viewBox="0 0 24 24"${size ? ` style="width:${size}px;height:${size}px"` : ''} aria-hidden="true">${ICON[n]}</svg>`;
+
+/* -------------------------------------------------------------- данные */
+
+const SEED = {
+  role: 'owner',
+  /** Сколько кассир может скинуть с одной позиции без разрешения владельца. */
+  limit: 500,
+  /**
+   * Товар — это модель, а не коробка.
+   *
+   * На коробке с телефоном штрих-код свой у каждой трубки, поэтому
+   * кодов у товара много: пикнули новую коробку — код прибавился к той
+   * же модели. Привязывать товар к одному коду значило бы заводить
+   * «новый товар» на каждый проданный телефон.
+   */
+  goods: [
+    { id: 'g1',  codes: ['4870001234561'], name: 'iPhone 13 128 ГБ',        model: 'iPhone 13',        mem: '128 ГБ', cost: 58000, price: 67000, stock: 3 },
+    { id: 'g2',  codes: ['4870001234578'], name: 'Samsung A15 128 ГБ',      model: 'Samsung A15',      mem: '128 ГБ', cost: 14500, price: 17900, stock: 6 },
+    { id: 'g3',  codes: ['4870001234585'], name: 'Redmi 13C 128 ГБ',        model: 'Redmi 13C',        mem: '128 ГБ', cost: 9800,  price: 12500, stock: 8 },
+    { id: 'g4',  codes: ['4870001234592'], name: 'Чехол силикон iPhone 13', model: 'Чехол силикон iPhone 13',         cost: 180,   price: 450,   stock: 24 },
+    { id: 'g5',  codes: ['4870001234608'], name: 'Чехол книжка Samsung A15',model: 'Чехол книжка Samsung A15',        cost: 250,   price: 600,   stock: 17 },
+    { id: 'g6',  codes: ['4870001234615'], name: 'Стекло защитное',         model: 'Стекло защитное',                 cost: 90,    price: 300,   stock: 40 },
+    { id: 'g7',  codes: ['4870001234622'], name: 'Кабель Type-C, 1 м',      model: 'Кабель Type-C, 1 м',              cost: 150,   price: 400,   stock: 31 },
+    { id: 'g8',  codes: ['4870001234639'], name: 'Наушники проводные',      model: 'Наушники проводные',              cost: 300,   price: 750,   stock: 12 },
+    { id: 'g9',  codes: ['4870001234646'], name: 'Повербанк 10000 мА·ч',    model: 'Повербанк 10000 мА·ч',            cost: 1100,  price: 2200,  stock: 7 },
+    { id: 'g10', codes: ['4870001234653'], name: 'Зарядка 20 Вт',           model: 'Зарядка 20 Вт',                   cost: 400,   price: 950,   stock: 15 },
+  ],
+  checks: [
+    { id: 'c1', at: Date.now() - 7200e3, by: 'Нурбек',   total: 13100, cost: 10250, off: 300,
+      lines: [{ name: 'Redmi 13C 128 ГБ', price: 12500, qty: 1, off: 300 }, { name: 'Стекло защитное', price: 300, qty: 1, off: 0 },
+              { name: 'Чехол силикон iPhone 13', price: 450, qty: 1, off: 0 }] },
+    { id: 'c2', at: Date.now() - 3600e3, by: 'Нурбек',   total: 1050,  cost: 450,   off: 100,
+      lines: [{ name: 'Кабель Type-C, 1 м', price: 400, qty: 1, off: 100 }, { name: 'Наушники проводные', price: 750, qty: 1, off: 0 }] },
+    { id: 'c3', at: Date.now() - 900e3,  by: 'Владелец', total: 17900, cost: 14500, off: 0,
+      lines: [{ name: 'Samsung A15 128 ГБ', price: 17900, qty: 1, off: 0 }] },
+  ],
+  /**
+   * Две учётные записи на магазин, а не по человеку на каждого.
+   * Кассиры работают под общей: так проще менять смены, но из чека
+   * пропадает, кто именно продал.
+   *
+   * Заводских паролей нет. Пустой код кассира — вход без кода: смену
+   * открывают по двадцать раз на дню, и спрашивать цифры каждый раз
+   * незачем. Пустой код владельца значит другое — «ещё не придуман»:
+   * за его записью закупочные цены и выручка, и первый вход туда идёт
+   * через придумывание кода, а не мимо него.
+   */
+  accounts: { owner: '', cashier: '' },
+  /**
+   * Люди на кассе. Владелец заводит их в «Ещё»; кассир перед продажей
+   * нажимает своё имя, и чек записывается на него.
+   */
+  staff: [{ id: 's1', name: 'Нурбек' }],
+  /**
+   * Проданные коробки: код -> когда и в каком чеке. У телефона код (IMEI)
+   * свой на каждой коробке, и продать одну коробку дважды нельзя.
+   */
+  sold: {},
+  notes: [],
+};
+
+const KEY = 'demo-phones-v3';
+const QUICK_OFF = [50, 100, 200, 500];
+
+const TABS = {
+  owner: [
+    { id: 'sale',   icon: 'bag',    text: 'Продажа' },
+    { id: 'intake', icon: 'box',    text: 'Приём' },
+    { id: 'report', icon: 'chart',  text: 'Отчёт' },
+    { id: 'more',   icon: 'people', text: 'Ещё' },
+  ],
+  cashier: [
+    { id: 'sale',   icon: 'bag',    text: 'Продажа' },
+    { id: 'goods',  icon: 'tag',    text: 'Цены' },
+    { id: 'checks', icon: 'paper',  text: 'Мои чеки' },
+    { id: 'more',   icon: 'people', text: 'Ещё' },
+  ],
+};
+
+function pinnedRole() {
+  const path = location.pathname.replace(/\/+$/, '').split('/').pop().replace(/\.html$/, '');
+  const asked = new URLSearchParams(location.search).get('role') || path;
+  return asked === 'owner' || asked === 'cashier' ? asked : null;
+}
+const pinned = pinnedRole();
+
+/** Кто вошёл. null — показываем замок. Объявлено до первого обращения. */
+let signed = null;
+let pin = '';
+/** Кто из кассиров сейчас за прилавком. Не хранится: после перезапуска имя выбирают заново. */
+let sellerId = null;
+/** Первый из двух вводов, когда владелец придумывает себе код. */
+let newPin = null;
+/** Владелец меняет уже заданный код. */
+let changing = false;
+
+/** Отбор в списке «к какому товару отнести эту коробку». */
+let pick = '';
+
+/**
+ * Черновик нового товара.
+ *
+ * Лист перерисовывается при каждом нажатии — например, когда выбирают
+ * память кнопкой, — а innerHTML стирает всё набранное. Поэтому то, что
+ * уже введено, живёт здесь, а не только в полях.
+ */
+let ng = null;
+
+/**
+ * Запасной код.
+ *
+ * Владелец меняет коды сам и может их забыть — а касса стоит в его
+ * магазине, данные лежат только в ней, и войти больше нечем. Этот код
+ * знает тот, кто кассу ставил, и пускает он владельцем, какие бы коды
+ * ни были заданы. На экране его нет и быть не должно.
+ */
+const SPARE = '1604';
+
+/** Кода владельца ещё нет (или его меняют) — спрашиваем дважды. */
+const ownerSetup = () => changing || !data.accounts.owner;
+
+/** Кого пускаем с этим набором цифр. null — никого. */
+function whoFor(value) {
+  if (value === SPARE) return 'owner';
+  // Пустой код владельца — не «вход без кода», а «кода ещё нет».
+  if (ownerSetup()) return null;
+  return value === data.accounts.owner ? 'owner' : null;
+}
+
+/** Пустить внутрь и поздороваться. */
+function letIn(who) {
+  signed = who;
+  data.role = who;
+  pin = '';
+  newPin = null;
+  changing = false;
+  sheet = null;
+  save();
+  render();
+  return flash(who === 'owner' ? 'Здравствуйте, владелец' : 'Смена открыта');
+}
+
+/**
+ * Первый вход владельца: кода ещё нет, его надо придумать.
+ *
+ * Спрашиваем дважды. Четыре цифры легко промахнуть, а промах здесь
+ * запирает хозяина от его же выручки — и чинится только запасным кодом,
+ * которого у него нет.
+ */
+function makeOwnerPin() {
+  // Запасной код сюда тоже годится: он пускает, а не заводит новый код.
+  // Побочно это не даёт выбрать его себе и получить два смысла у одних
+  // и тех же цифр.
+  if (pin === SPARE) return letIn('owner');
+
+  if (pin.length !== 4) { render(); return flash('Нужно четыре цифры'); }
+
+  if (newPin === null) {
+    newPin = pin;
+    pin = '';
+    render();
+    return flash('Повторите код');
+  }
+
+  if (pin !== newPin) {
+    newPin = null;
+    pin = '';
+    render();
+    return flash('Коды не совпали — наберите заново');
+  }
+
+  data.accounts = { ...data.accounts, owner: pin };
+  letIn('owner');
+  return flash('Код сохранён');
+}
+
+/**
+ * Где лежат данные.
+ *
+ * В программе на компьютере — обычным файлом рядом с ней: его видно,
+ * можно скопировать на флешку и унести. В браузере — внутри браузера,
+ * потому что к файлам он доступа не имеет.
+ */
+const DESK = typeof window !== 'undefined' ? window.kassa : null;
+
+/**
+ * Приведение сохранённого к нынешнему виду.
+ *
+ * Раньше у товара был один штрих-код. С телефонами так не выходит —
+ * код на каждой коробке свой, — и поле стало списком. Данные, записанные
+ * до этой перемены, переносим молча: магазин не должен ничего делать.
+ */
+function fixUp(d) {
+  for (const g of d.goods ?? []) {
+    if (!Array.isArray(g.codes)) g.codes = g.code ? [String(g.code)] : [];
+    delete g.code;
+    if (!g.model) g.model = g.name;
+    // Телефоны и прочее с памятью — штучный товар, код на каждой коробке свой.
+    if (typeof g.serial !== 'boolean') g.serial = !!(g.mem || g.ram) || g.codes.length > 1;
+  }
+  if (!Array.isArray(d.staff)) d.staff = [];
+  if (!d.sold || typeof d.sold !== 'object') d.sold = {};
+  // Что продано до этой перемены, тоже считается проданным.
+  const штучные = new Set((d.goods ?? []).filter((g) => g.serial).map((g) => g.name));
+  for (const c of d.checks ?? []) {
+    for (const l of c.lines ?? []) {
+      if (!штучные.has(l.name)) continue;
+      for (const code of l.codes ?? []) d.sold[code] ??= { at: c.at, id: c.id };
+    }
+  }
+  return d;
+}
+
+/**
+ * С чего касса начинается.
+ *
+ * В программе на компьютере — с пустого магазина: это чужой магазин, и
+ * выдуманные айфоны в нём не нужны. В браузере наоборот — демонстрация
+ * без товара и без истории продаж ничего не показывает, поэтому там
+ * остаётся витрина с выдуманным магазином.
+ */
+function startState() {
+  const base = structuredClone(SEED);
+  if (!DESK) return base;
+  return { ...base, goods: [], checks: [], notes: [], staff: [], sold: {} };
+}
+
+function load() {
+  if (DESK) {
+    const saved = DESK.load();
+    return fixUp(saved ? { ...startState(), ...saved } : startState());
+  }
+  try { const raw = localStorage.getItem(KEY); if (raw) return fixUp({ ...startState(), ...JSON.parse(raw) }); }
+  catch (e) { /* приватное окно */ }
+  return fixUp(startState());
+}
+
+function save() {
+  if (DESK) return DESK.save(data);
+  try { localStorage.setItem(KEY, JSON.stringify(data)); return true; } catch (e) { return false; }
+}
+
+/**
+ * Исходное состояние демонстрации.
+ *
+ * История продаж прибавляется здесь же, а не только при первом запуске:
+ * иначе «вернуть в исходный вид» оставляло бы отчёт без графиков, и
+ * показывать после сброса было бы нечего.
+ */
+function freshData() {
+  const fresh = startState();
+  if (!DESK) fresh.checks = [...makeHistory(), ...fresh.checks];
+  return fresh;
+}
+
+let data = load();
+// Программа открывается кассой: продавец утром включает ноутбук и сразу
+// работает. Во владельца переходят отдельно и по коду.
+signed = pinned ?? 'cashier';
+data.role = signed;
+
+// Выдуманная история — только для витрины в браузере. В программе
+// магазина отчёт честно пуст, пока не появятся настоящие продажи.
+if (!DESK && !data.checks.some((c) => c.at < Date.now() - 24 * 3600e3)) {
+  data.checks = [...makeHistory(), ...data.checks];
+}
+
+/** Чек: строки по товару, у каждой своя скидка в сомах. */
+let check = [];
+/** Скидка на весь чек, в сомах. Построчные скидки считаются отдельно. */
+let checkOff = 0;
+let tab = 'sale', sheet = null, search = '', lastScan = null, settle = false;
+
+/** Что пришло с пикалки последним — для проверки в «Ещё». */
+let probe = { code: '', at: 0, enter: false, chars: 0 };
+let camera = null;
+/** Пока идёт подключение, код не продаёт товар, а записывает пикалку. */
+let online = navigator.onLine;
+/** Приглашение установить программу приходит от браузера, а не по нашей воле. */
+let installer = null;
+
+/** Камеру умеет не всякий телефон: в Safari распознавателя штрих-кодов нет. */
+const canCamera = () => 'BarcodeDetector' in window && !!navigator.mediaDevices?.getUserMedia;
+
+const som = (v) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Math.round(v)) + ' с';
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const owner = () => data.role === 'owner';
+/** Выбранный кассир; пропадает, если владелец убрал его из списка. */
+const me = () => data.staff.find((s) => s.id === sellerId) ?? null;
+const sellerName = () => (owner() ? 'Владелец' : me()?.name ?? null);
+
+/** Пока кассир не выбрал себя, продавать нельзя: чек не на кого записать. */
+function needName() {
+  if (owner() || me()) return false;
+  flash('Сначала нажмите на своё имя');
+  return true;
+}
+const good = (id) => data.goods.find((g) => g.id === id);
+const byCode = (code) => data.goods.find((g) => g.codes.includes(String(code).trim()));
+
+/** Коротко о кодах товара для списков: у телефонов их много. */
+function codeLabel(g) {
+  const n = g.codes.length;
+  if (n === 0) return 'кода нет';
+  if (n === 1) return g.codes[0];
+  const last = n % 10;
+  const hundred = n % 100;
+  const word = last === 1 && hundred !== 11 ? 'код'
+    : last >= 2 && last <= 4 && (hundred < 12 || hundred > 14) ? 'кода'
+    : 'кодов';
+  return `${n} ${word} с коробок`;
+}
+const markup = (g) => (g.cost > 0 ? Math.round(((g.price - g.cost) / g.cost) * 100) : 0);
+
+function plural(n, one, few, many) {
+  const a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return few;
+  if (b === 1) return one;
+  return many;
+}
+
+function flash(text) {
+  const host = document.getElementById('flash');
+  host.innerHTML = `<div class="flash">${esc(text)}</div>`;
+  clearTimeout(flash.t);
+  flash.t = setTimeout(() => { host.innerHTML = ''; }, 2400);
+}
+
+function total() {
+  let gross = 0, off = 0, cost = 0, count = 0;
+  for (const l of check) {
+    const g = good(l.id);
+    if (!g) continue;
+    gross += g.price * l.qty;
+    off += l.off;
+    cost += g.cost * l.qty;
+    count += l.qty;
+  }
+  // Скидка на весь чек прибавляется к построчным и не уводит «к оплате»
+  // ниже нуля: отдавать товар с доплатой покупателю никто не собирался.
+  const whole = Math.min(checkOff, Math.max(0, gross - off));
+  off += whole;
+  return { gross, off, whole, due: gross - off, cost, count, profit: gross - off - cost };
+}
+
+const shift = () => data.checks.filter((c) => c.at >= Date.now() - 12 * 3600e3);
+const mine = () => shift().filter((c) => owner() || (me() && (c.byId ? c.byId === me().id : c.by === me().name)));
+
+/* ------------------------------------------------------------- сканер */
+
+/**
+ * Пикалка подключена к ноутбуку и работает как клавиатура: печатает цифры
+ * кода и жмёт Enter. Поэтому слушаем весь документ, а не поле ввода —
+ * кассиру не надо никуда целиться мышкой, он просто пикает.
+ *
+ * Отличаем пистолет от человека по скорости: между символами у него
+ * миллисекунды. Если курсор стоит в поле ввода, не мешаем печатать руками.
+ */
+let buf = '', lastKey = 0;
+
+document.addEventListener('keydown', (event) => {
+  const el = document.activeElement;
+  const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  if (typing && el.id !== 'code-field') return;
+
+  const now = Date.now();
+  // Порог щедрый: проводной пистолет печатает за миллисекунды, но у
+  // Bluetooth бывают заминки, и жёсткие сто миллисекунд рвали бы код
+  // посередине. Человеку это не мешает: при наборе руками курсор стоит
+  // в поле ввода, и сюда мы не доходим.
+  if (now - lastKey > 300) buf = '';
+  lastKey = now;
+
+  // Часть пистолетов настроена слать Tab вместо Enter — принимаем оба.
+  if (event.key === 'Enter' || event.key === 'Tab') {
+    if (buf.length >= 6) {
+      event.preventDefault();
+      const code = buf;
+      probe = { code, at: Date.now(), enter: true, chars: code.length };
+      buf = '';
+      onScan(code);
+      if (tab === 'more') render();
+    } else if (buf.length) {
+      // Пришло мало символов: обычно это раскладка или настройка пистолета.
+      probe = { code: buf, at: Date.now(), enter: true, chars: buf.length };
+      if (tab === 'more') render();
+    }
+    buf = '';
+    return;
+  }
+  if (event.key.length === 1) {
+    buf += event.key;
+    probe = { code: buf, at: Date.now(), enter: false, chars: buf.length };
+  }
+});
+
+function onScan(code) {
+  lastScan = code;
+
+  const g = byCode(code);
+  const soldDay = (x) => new Date(x.at).toLocaleDateString('ru-RU');
+
+  if (tab === 'intake') {
+    if (data.sold[code]) { flash(`Коробка ${code} уже продана ${soldDay(data.sold[code])}`); return; }
+    // Штучный товар: знакомый код значит, что эту коробку уже принимали.
+    if (g?.serial) { flash(`Коробка ${code} уже принята: ${g.name}`); return; }
+    if (g) { sheet = { k: 'take', id: g.id }; render(); }
+    else {
+      // Незнакомый код у телефона почти всегда значит не новый товар,
+      // а ещё одну трубку той же модели. Поэтому сначала предлагаем
+      // выбрать из заведённого, а не заполнять карточку заново.
+      pick = '';
+      sheet = { k: 'newcode', code };
+      render();
+    }
+    return;
+  }
+
+  if (needName()) return;
+
+  if (data.sold[code]) { flash(`Эта коробка уже продана ${soldDay(data.sold[code])}`); return; }
+  if (!g) {
+    flash(`Код ${code} не найден${owner() ? '. Заведите товар в «Приёме»' : '. Позовите владельца'}`);
+    return;
+  }
+  if (g.serial && check.some((l) => l.id === g.id && l.codes.includes(code))) {
+    flash('Эта коробка уже в чеке');
+    return;
+  }
+  if (g.stock <= 0) { flash(`${g.name}: на остатке ноль`); return; }
+
+  if (!addLine(g.id, code)) return;
+  settle = true;
+  render();
+}
+
+/**
+ * Прибавить товар в чек.
+ *
+ * Код коробки запоминается в строке: у телефонов он свой на каждой
+ * трубке, и после продажи по нему видно, какая именно ушла. Прибавить
+ * без кода тоже можно — руками из списка.
+ */
+function addLine(id, code) {
+  const g = good(id);
+  const line = check.find((l) => l.id === id);
+  // Больше, чем лежит на остатке, в чек не набрать: нельзя продать то,
+  // чего нет, сколько бы раз ни пикнули.
+  if ((line?.qty ?? 0) >= g.stock) {
+    flash(`${g.name}: на остатке ${g.stock} шт — больше в чек не добавить`);
+    return false;
+  }
+  if (line) {
+    line.qty += 1;
+    if (code && !line.codes.includes(code)) line.codes.push(code);
+  } else {
+    check.push({ id, qty: 1, off: 0, codes: code ? [code] : [] });
+  }
+  return true;
+}
+
+/* -------------------------------------------------------------- экраны */
+
+function scanBox() {
+  return `
+    <div class="scanbox live">
+      ${svg('scan')}
+      <div class="big">Пикните товар</div>
+      <div class="sub">Сканер подключён к ноутбуку и готов. Код можно ввести и руками.</div>
+      <div class="pair" style="margin-top:12px">
+        <button class="btn line" id="code-manual" type="button" style="margin-top:0">Ввести код</button>
+        <button class="btn line" id="pick-list" type="button" style="margin-top:0">Выбрать из списка</button>
+      </div>
+      ${canCamera() ? '<button class="btn line" id="cam-open" type="button">Снять камерой</button>' : ''}
+    </div>`;
+}
+
+function viewWho() {
+  if (data.staff.length === 0) {
+    return `
+      <h2>Кто за кассой</h2>
+      <p class="q">Кассиров пока нет. Владелец добавляет их в разделе «Ещё».</p>
+      <button class="btn line" id="owner-in" type="button">Войти как владелец</button>`;
+  }
+  return `
+    <h2>Кто за кассой?</h2>
+    <p class="q">Нажмите на своё имя: продажи запишутся на вас.</p>
+    <div class="goods">
+      ${data.staff.map((s) => `
+        <button class="good" type="button" data-who="${esc(s.id)}"><span class="t">${esc(s.name)}</span></button>`).join('')}
+    </div>`;
+}
+
+function viewSale() {
+  if (!owner() && !me()) return viewWho();
+  const t = total();
+  return `
+    <div class="two-pane">
+      <div>
+        ${owner() ? '' : `<p class="q2" style="margin:0 0 10px">Продаёт: <b>${esc(me().name)}</b>
+          <button class="plain q2" id="who-change" type="button" style="color:var(--red);font-weight:600;width:auto">сменить</button></p>`}
+        ${scanBox()}
+        ${lastScan ? `<p class="q2" style="margin-top:10px">Последний код: <b class="n">${esc(lastScan)}</b></p>` : ''}
+
+        <h2>Ходовое</h2>
+        <div class="goods">
+          ${data.goods.slice(0, 6).map((g) => `
+            <button class="good" data-add="${g.id}" type="button" ${g.stock <= 0 ? 'disabled' : ''}>
+              <span class="t">${esc(g.name)}</span>
+              <span class="p n">${som(g.price)}</span>
+              <span class="s n">${g.stock} шт</span>
+            </button>`).join('')}
+        </div>
+      </div>
+
+      <div class="pane-right">
+        <div class="rows" style="padding:13px">
+          <h2 style="margin:0 0 10px">Чек</h2>
+          ${check.length === 0
+            ? '<p class="q" style="margin:0">Пусто. Пикните первый товар.</p>'
+            : check.map((l) => {
+                const g = good(l.id);
+                const sum = g.price * l.qty;
+                return `<div class="row">
+                  <div class="grow">
+                    <div class="t">${esc(g.name)}</div>
+                    <div class="q2 n">${som(g.price)}${l.qty > 1 ? ` × ${l.qty}` : ''}</div>
+                    <button class="plain q2" type="button" data-off="${l.id}"
+                            style="margin-top:4px;color:var(--red);font-weight:600;width:auto">
+                      ${l.off ? `скинуто ${som(l.off)} — изменить` : 'сделать скидку'}
+                    </button>
+                  </div>
+                  <div style="text-align:right">
+                    <div class="amt n">${som(sum - l.off)}</div>
+                    <div class="stepper" style="margin-top:6px">
+                      <button type="button" data-less="${l.id}" aria-label="Убрать одну">${svg('minus')}</button>
+                      <span class="v">${l.qty}</span>
+                    </div>
+                  </div>
+                </div>`;
+              }).join('')}
+
+          ${check.length ? `
+            <div class="ledger">
+              <div><span class="q">Сумма</span><span class="n" style="font-weight:600">${som(t.gross)}</span></div>
+              ${t.off ? `<div><span class="off">Скидка</span><span class="off n">−${som(t.off)}</span></div>` : ''}
+              <div><button class="plain q2" id="whole-off" type="button"
+                      style="color:var(--red);font-weight:600;width:auto;text-align:left">
+                    ${t.whole ? `скидка на чек ${som(t.whole)} — изменить` : 'скинуть с чека'}
+                  </button></div>
+              ${owner() ? `<div><span class="q">Прибыль</span><span class="n" style="color:var(--money);font-weight:600">${som(t.profit)}</span></div>` : ''}
+              <div style="align-items:flex-end"><span style="font-weight:700">К оплате</span><span class="big">${som(t.due)}</span></div>
+            </div>
+            <button class="sell" id="sell" type="button" style="margin-top:12px">${svg('check')}Продать за ${som(t.due)}</button>
+            <button class="btn line" id="check-drop" type="button">Отменить чек</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function viewIntake() {
+  return `
+    <p class="hint">Приём товара. Пикните коробку: знакомый код — просто добавится количество, незнакомый — выберете из списка, что это за модель. Карточку заводят один раз на модель, а не на каждую трубку.</p>
+    ${scanBox()}
+
+    <h2>Что на остатке</h2>
+    <div class="rows">
+      ${data.goods.map((g) => `
+        <div class="row">
+          <button class="plain grow" type="button" data-edit="${g.id}">
+            <div class="t">${esc(g.name)}</div>
+            <div class="q2 n">${esc(codeLabel(g))}</div>
+            <div class="q2 n">закуп ${som(g.cost)}, наценка ${markup(g)}%</div>
+          </button>
+          <div style="text-align:right">
+            <div class="amt n">${som(g.price)}</div>
+            <div class="q2 n" style="${g.stock <= 2 ? 'color:var(--red);font-weight:700' : ''}">${g.stock} шт</div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <button class="btn line" id="good-new" type="button">${svg('plus')}Завести товар руками</button>`;
+}
+
+function viewReport() {
+  const shiftList = shift();
+  const all = data.checks;
+  const revenue = shiftList.reduce((s, c) => s + c.total, 0);
+  const cost = shiftList.reduce((s, c) => s + c.cost, 0);
+  const offs = shiftList.reduce((s, c) => s + c.off, 0);
+  const avg = shiftList.length ? Math.round(revenue / shiftList.length) : 0;
+  const stockCost = data.goods.reduce((s, g) => s + g.cost * g.stock, 0);
+
+  return `
+    <h2>Смена</h2>
+    <div class="figures">
+      <div class="figure"><b>${som(revenue)}</b><span>выручка</span></div>
+      <div class="figure"><b style="color:var(--money)">${som(revenue - cost)}</b><span>прибыль</span></div>
+      <div class="figure"><b>${shiftList.length}</b><span>чеков</span></div>
+    </div>
+    <div class="figures" style="margin-top:9px">
+      <div class="figure"><b>${som(avg)}</b><span>средний чек</span></div>
+      <div class="figure"><b style="color:var(--cut)">${som(offs)}</b><span>скинули</span></div>
+      <div class="figure"><b>${som(stockCost)}</b><span>денег в товаре</span></div>
+    </div>
+
+    ${(() => {
+      const byWho = new Map();
+      for (const c of shiftList) {
+        const r = byWho.get(c.by) ?? { n: 0, sum: 0 };
+        r.n += 1; r.sum += c.total; byWho.set(c.by, r);
+      }
+      if (byWho.size === 0) return '';
+      return `<h2>По кассирам</h2><div class="rows">${[...byWho].map(([name, r]) => `
+        <div class="row"><div class="grow"><div class="t">${esc(name)}</div>
+          <div class="q2">${r.n} ${plural(r.n, 'чек', 'чека', 'чеков')}</div></div>
+          <div class="amt n">${som(r.sum)}</div></div>`).join('')}</div>`;
+    })()}
+
+    <h2>Как идёт торговля</h2>
+    <div id="charts" style="display:grid;gap:12px;position:relative">
+      ${chartDays(all, 14)}
+      ${chartHours(all)}
+      ${chartTop(all)}
+    </div>
+
+    ${viewAdvice()}
+
+    ${runningOut()}
+
+    <h2>Выгрузка</h2>
+    <p class="q">Книга Excel со всем: сводка и советы, товары с наценкой и запасом, все чеки и позиции, разбивка по дням и часам. Числа — числами, можно считать прямо в Excel.</p>
+    <button class="btn" id="xlsx" type="button">${svg('paper')}Выгрузить в Excel</button>
+
+    <h2>Чеки смены</h2>
+    ${shiftList.length === 0 ? '<p class="q">Сегодня продаж ещё не было.</p>' : `
+      <div class="rows">
+        ${shiftList.slice().reverse().map((c) => `
+          <div class="row">
+            <button class="plain grow" type="button" data-receipt="${c.id}">
+              <div class="t n">${som(c.total)}</div>
+              <div class="q2">${c.lines.length} ${plural(c.lines.length, 'позиция', 'позиции', 'позиций')}, ${esc(c.by)}, ${new Date(c.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div>
+            </button>
+            <div style="text-align:right">
+              ${c.off ? `<span class="tag wt n">−${som(c.off)}</span>` : ''}
+              <div class="q2 n" style="margin-top:5px;color:var(--money)">${som(c.total - c.cost)}</div>
+            </div>
+          </div>`).join('')}
+      </div>`}`;
+}
+
+/**
+ * Что заканчивается.
+ *
+ * Не просто «мало штук», а на сколько дней хватит при нынешнем спросе:
+ * четыре чехла, которые берут по два в день, кончатся раньше, чем один
+ * телефон, который берут раз в месяц.
+ */
+function runningOut() {
+  const since = Date.now() - 21 * 24 * 3600e3;
+  const sold = new Map();
+  for (const c of data.checks) {
+    if (c.at < since) continue;
+    for (const l of c.lines) sold.set(l.name, (sold.get(l.name) ?? 0) + l.qty);
+  }
+
+  const rows = data.goods
+    .map((g) => {
+      const perDay = (sold.get(g.name) ?? 0) / 21;
+      const days = perDay > 0 ? Math.floor(g.stock / perDay) : null;
+      return { g, perDay, days };
+    })
+    .filter((r) => r.g.stock <= 3 || (r.days !== null && r.days <= 10))
+    .sort((a, b) => (a.days ?? 999) - (b.days ?? 999))
+    .slice(0, 8);
+
+  if (rows.length === 0) {
+    return '<h2>Что заканчивается</h2><p class="q">Всего хватает: ни одна позиция не кончается в ближайшие десять дней.</p>';
+  }
+
+  return `
+    <h2>Что заканчивается</h2>
+    <p class="q">Считается по спросу за три недели.</p>
+    <div class="rows">
+      ${rows.map(({ g, perDay, days }) => `
+        <div class="row">
+          <div class="grow">
+            <div class="t">${esc(g.name)}</div>
+            <div class="q2 n">берут ${perDay >= 1 ? perDay.toFixed(1) : perDay > 0 ? perDay.toFixed(2) : '0'} шт в день</div>
+          </div>
+          <div style="text-align:right">
+            <div class="amt n" style="color:${g.stock <= 2 ? 'var(--alarm)' : 'var(--ink)'}">${g.stock} шт</div>
+            <div class="q2 n">${days === null ? 'спроса нет' : days === 0 ? 'кончился' : `на ${days} ${plural(days, 'день', 'дня', 'дней')}`}</div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function viewGoods() {
+  const q = search.trim().toLowerCase();
+  const list = data.goods.filter((g) => !q || (g.name + ' ' + g.codes.join(' ')).toLowerCase().includes(q));
+  return `
+    <p class="hint">Цены для ответа покупателю. Закупочную цену видит только владелец.</p>
+    <div class="search">
+      ${svg('scan', 18)}
+      <input id="q" value="${esc(search)}" placeholder="Название или код" autocomplete="off">
+      ${search ? `<button class="plain" id="q-clear" type="button" aria-label="Очистить">${svg('cross', 16)}</button>` : ''}
+    </div>
+    <div class="rows">
+      ${list.length === 0 ? '<p class="q" style="padding:12px 0">Ничего не нашлось.</p>' : list.map((g) => `
+        <div class="row">
+          <div class="grow"><div class="t">${esc(g.name)}</div><div class="q2 n">${esc(codeLabel(g))}</div></div>
+          <div style="text-align:right">
+            <div class="amt n">${som(g.price)}</div>
+            <div class="q2 n" style="${g.stock <= 2 ? 'color:var(--red);font-weight:700' : ''}">${g.stock} шт</div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function viewChecks() {
+  const list = mine();
+  return `
+    <p class="hint">Ваши чеки за смену. Прибыль и закупочные цены видит владелец.</p>
+    ${list.length === 0 ? '<p class="q">Вы сегодня ещё ничего не продали.</p>' : `
+      <div class="rows">
+        ${list.slice().reverse().map((c) => `
+          <div class="row">
+            <button class="plain grow" type="button" data-receipt="${c.id}">
+              <div class="t n">${som(c.total)}</div>
+              <div class="q2">${c.lines.length} ${plural(c.lines.length, 'позиция', 'позиции', 'позиций')}, ${new Date(c.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div>
+            </button>
+            ${c.off ? `<span class="tag nt n">−${som(c.off)}</span>` : ''}
+          </div>`).join('')}
+      </div>
+      <div class="figures" style="margin-top:14px">
+        <div class="figure"><b>${som(list.reduce((s, c) => s + c.total, 0))}</b><span>на руках</span></div>
+        <div class="figure"><b>${list.length}</b><span>чеков</span></div>
+        <div class="figure"><b>${som(list.reduce((s, c) => s + c.off, 0))}</b><span>скинули</span></div>
+      </div>`}`;
+}
+
+function viewMore() {
+  return `
+    <h2>Кто сейчас в системе</h2>
+    ${pinned
+      ? `<p class="q">Эта ссылка открывается как <b>${owner() ? 'владелец' : 'кассир'}</b>. Вторая ссылка покажет то же самое глазами ${owner() ? 'кассира' : 'владельца'}.</p>`
+      : owner()
+        ? `<p class="q">Вы вошли владельцем: видно закупочные цены, выручку и настройки.</p>
+           <button class="btn line" id="owner-out" type="button">Вернуться к кассе</button>`
+        : `<p class="q">Касса${me() ? `, продаёт <b>${esc(me().name)}</b>` : ''}. Закупочные цены и выручка не видны — они за кодом владельца.</p>
+           ${me() ? '<button class="btn line" id="who-change" type="button">Сменить кассира</button>' : ''}
+           <button class="btn line" id="owner-in" type="button">Войти как владелец</button>`}
+
+    ${owner() ? `
+      <h2>Кассиры</h2>
+      <div class="rows" style="padding:13px">
+        <p class="q" style="margin:0 0 10px">Кассир перед продажей нажимает на своё имя, и чеки записываются на него.</p>
+        ${data.staff.length === 0 ? '<p class="q2">Пока никого.</p>' : data.staff.map((s) => `
+          <div class="row"><div class="grow t">${esc(s.name)}</div>
+            <button class="less" type="button" data-staffdel="${esc(s.id)}" style="position:static;box-shadow:none" aria-label="Убрать">${svg('cross')}</button></div>`).join('')}
+        <label class="fld" style="margin:12px 0 0"><span>Имя нового кассира</span>
+          <input id="staff-name" maxlength="30" placeholder="Например: Айгерим" autocomplete="off"></label>
+        <button class="btn" id="staff-add" type="button">${svg('plus')}Добавить кассира</button>
+      </div>
+
+      <h2>Предел скидки кассира</h2>
+      <div class="rows" style="padding:13px">
+        <p class="q" style="margin:0 0 10px">Больше этой суммы с одной позиции кассир скинуть не сможет. Ноль — скидки запрещены.</p>
+        <label class="fld" style="margin-bottom:0"><span>Сомов с позиции</span>
+          <input id="limit" type="number" inputmode="numeric" value="${data.limit}" min="0"></label>
+        <button class="btn" id="limit-save" type="button">Сохранить</button>
+      </div>
+
+      <h2>Ваш код</h2>
+      <div class="rows" style="padding:13px">
+        <p class="q" style="margin:0 0 10px">Код закрывает закупочные цены, выручку и настройки. Кассир работает без него.</p>
+        <button class="btn line" id="pin-change" type="button" style="margin:0">Сменить свой код</button>
+      </div>
+`
+      : `<h2>Смена</h2>
+         <p class="q">Скинуть можно до <b class="n">${som(data.limit)}</b> с одной позиции — предел задаёт владелец.</p>`}
+
+    <h2>Что прислала пикалка</h2>
+    <div class="rows" style="padding:13px">
+      ${probe.at ? `
+        <div class="row" style="padding-top:0">
+          <div class="grow"><div class="q2">Последний код</div><div class="t n">${esc(probe.code)}</div></div>
+          <span class="tag ${probe.enter ? 'ok' : 'wt'}">${probe.enter ? 'Enter пришёл' : 'ждём Enter'}</span>
+        </div>
+        <div class="row">
+          <div class="grow"><div class="q2">Символов</div><div class="t n">${probe.chars}</div></div>
+          <div style="text-align:right"><div class="q2">Когда</div>
+            <div class="t n">${new Date(probe.at).toLocaleTimeString('ru-RU')}</div></div>
+        </div>
+        ${/^[0-9]+$/.test(probe.code) ? '' : `
+          <div class="aside">Пришли не только цифры. Обычно это раскладка клавиатуры:
+            переключите ноутбук на английскую или задайте пистолету американскую раскладку
+            по инструкции к нему.</div>`}
+        ${probe.enter ? '' : `
+          <div class="aside">Пистолет не прислал Enter в конце. В инструкции к нему найдите
+            штрих-код настройки «Add CR suffix» или «Enter» и пикните его один раз.</div>`}`
+      : '<p class="q2" style="margin:0">Пикните что-нибудь — здесь появится то, что пришло. Это помогает понять, почему товар не находится.</p>'}
+      ${canCamera()
+        ? '<button class="btn line" id="cam-open" type="button">Проверить камеру телефона</button>'
+        : '<p class="q2" style="margin:10px 0 0">Этот браузер не читает штрих-коды камерой — нужен пистолет или ввод руками. На Android в Chrome камера работает.</p>'}
+    </div>
+
+    <h2>Программа на компьютере</h2>
+    <div class="rows" style="padding:13px">
+      <div class="row" style="padding-top:0">
+        <div class="grow"><div class="q2">Связь</div>
+          <div class="t">${online ? 'Интернет есть' : 'Интернета нет — касса работает дальше'}</div></div>
+        <span class="tag ${online ? 'ok' : 'wt'}">${online ? 'в сети' : 'без сети'}</span>
+      </div>
+      <div class="row">
+        <div class="grow"><div class="q2">Офлайн</div>
+          <div class="t" id="sw-state">проверяю…</div></div>
+      </div>
+      <p class="q" style="margin:10px 0 0">
+        ${DESK
+          ? 'Это программа на компьютере. Интернет ей не нужен вовсе, всё лежит вот в этом файле.'
+          : 'Касса ставится на ноутбук как обычная программа: свой значок, своё окно, без адресной строки. Один раз открыли с интернетом — дальше работает и без него.'}
+      </p>
+      ${DESK ? `
+        <div class="row"><div class="grow"><div class="q2">Файл с данными</div>
+          <div class="t n" style="font-size:12px;word-break:break-all">${esc(DESK.where())}</div></div></div>
+        <div class="row">
+          <div class="grow"><div class="q2">При включении компьютера</div>
+            <div class="t">${DESK.autoGet() ? 'Касса открывается сама' : 'Открывать вручную'}</div></div>
+          <button class="btn line" id="auto-toggle" type="button"
+                  style="width:auto;margin:0;padding:8px 14px">${DESK.autoGet() ? 'выключить' : 'включить'}</button>
+        </div>
+        <div class="pair">
+          <button class="btn line" id="open-folder" type="button" style="margin-top:10px">Показать папку</button>
+          <button class="btn line" id="backup" type="button" style="margin-top:10px">Сделать копию</button>
+        </div>` : ''}
+      ${DESK ? '' : `
+        <button class="btn" id="install" type="button" hidden>Установить на компьютер</button>
+        <p class="q2" id="install-note" style="margin:10px 0 0"></p>`}
+    </div>
+
+    ${DESK ? '' : `
+    <h2>Замечания по демонстрации</h2>
+    <p class="q">Что неудобно, чего не хватает. Потом нажмите «Скопировать» и отправьте одним сообщением.</p>
+    <div class="rows" style="padding:13px">
+      <label class="fld" style="margin-bottom:0"><span>Замечание</span>
+        <textarea id="note-in" rows="3" placeholder="Например: нужен обмен и возврат"></textarea></label>
+      <button class="btn line" id="note-save" type="button">Записать</button>
+    </div>
+    ${data.notes.length ? `
+      <div class="rows" style="margin-top:10px">
+        ${data.notes.map((n, i) => `<div class="row">
+          <div class="grow" style="font-size:13.5px">${esc(n)}</div>
+          <button class="less" type="button" data-nodrop="${i}" style="position:static;box-shadow:none" aria-label="Убрать">${svg('cross')}</button>
+        </div>`).join('')}
+      </div>
+      <button class="btn" id="note-copy" type="button">Скопировать всё</button>` : ''}
+
+    <h2>Демонстрация</h2>
+    <button class="btn line" id="reset" type="button">Вернуть в исходный вид</button>
+    <p class="q2" style="margin-top:12px">Всё, что вы здесь нажимаете, хранится только в этом браузере и никуда не уходит.</p>`}`;
+}
+
+/* --------------------------------------------------------------- листы */
+
+function sheetOff(id) {
+  const l = check.find((x) => x.id === id);
+  const g = good(id);
+  const sum = g.price * l.qty;
+  const cap = owner() ? sum : Math.min(data.limit * l.qty, sum);
+
+  return `
+    <h3>Скидка на ${esc(g.name)}</h3>
+    <p class="q">Цена ${som(sum)}${l.qty > 1 ? ` за ${l.qty} шт` : ''}. Скидка задаётся в сомах, а не в процентах.</p>
+
+    <div class="chipsrow" style="margin-bottom:12px">
+      ${QUICK_OFF.filter((v) => v <= cap).map((v) => `
+        <button class="chipx" type="button" data-setoff="${id}" data-v="${v}" aria-pressed="${l.off === v}">−${som(v)}</button>`).join('')}
+      ${l.off ? `<button class="chipx" type="button" data-setoff="${id}" data-v="0">убрать скидку</button>` : ''}
+    </div>
+
+    <div class="pair">
+      <label class="fld"><span>Скинуть, сом</span>
+        <input id="off-value" type="number" inputmode="numeric" value="${l.off}" min="0" max="${cap}"></label>
+      <label class="fld"><span>Отдать за, сом</span>
+        <input id="off-final" type="number" inputmode="numeric" value="${sum - l.off}" min="${sum - cap}" max="${sum}"></label>
+    </div>
+    <p class="q2">Можно задать любое из двух: впишете «отдать за 300» — скидка посчитается сама.</p>
+
+    ${owner()
+      ? '<p class="q2">Вы владелец, предел на вас не действует.</p>'
+      : `<p class="q2">Ваш предел — ${som(data.limit)} с позиции${l.qty > 1 ? `, то есть ${som(cap)} на ${l.qty} шт` : ''}.</p>`}
+
+    <button class="btn" data-offsave="${id}" type="button">Применить</button>
+    <button class="btn line" data-shut="1" type="button">Отмена</button>`;
+}
+
+/**
+ * Незнакомый код при приёме.
+ *
+ * Главная кнопка здесь не «завести товар», а список уже заведённого:
+ * пришла вторая такая же трубка — одно нажатие, код прибавился к
+ * модели, остаток вырос. Заводить карточку заново нужно только на
+ * действительно новую модель, и эта дорога ниже.
+ */
+function sheetNewCode(code) {
+  const q = pick.trim().toLowerCase();
+  const list = data.goods
+    .filter((g) => !q || g.name.toLowerCase().includes(q))
+    // Недавно принятое сверху: обычно приходит коробка за коробкой.
+    .sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
+    .slice(0, 8);
+
+  return `
+    <h3>Новая коробка</h3>
+    <p class="q">Код <b class="n">${esc(code ?? '')}</b> ещё не встречался. У телефонов он свой на каждой коробке — выберите, что это за товар.</p>
+
+    <div class="search">
+      ${svg('scan', 18)}
+      <input id="pick-q" value="${esc(pick)}" placeholder="Название товара" autocomplete="off" autofocus>
+      ${pick ? `<button class="plain" id="pick-clear" type="button" aria-label="Очистить">${svg('cross', 16)}</button>` : ''}
+    </div>
+
+    <div class="rows">
+      ${list.length === 0 ? '<p class="q" style="padding:12px 0">Ничего не нашлось.</p>' : list.map((g) => `
+        <div class="row">
+          <button class="plain grow" type="button" data-attach="${g.id}">
+            <div class="t">${esc(g.name)}</div>
+            <div class="q2 n">на остатке ${g.stock} шт${owner() ? `, закуп ${som(g.cost)}` : ''}</div>
+          </button>
+          <div class="amt n">${som(g.price)}</div>
+        </div>`).join('')}
+    </div>
+
+    ${data.goods.length > 8 ? '<p class="q2">Показаны восемь последних — остальное найдётся по названию.</p>' : ''}
+
+    <div class="stick">
+      <button class="btn" id="ng-open" type="button">${svg('plus')}Это новый товар</button>
+      <button class="btn line" data-shut="1" type="button">Отмена</button>
+    </div>`;
+}
+
+/**
+ * Привычный набор, а за ним — то, что магазин завёл сам.
+ *
+ * Порядок держим: память, перетасованная по частоте, читается хуже, чем
+ * выстроенная по возрастанию — глаз ищет не самое частое, а своё.
+ */
+function hints(field, standard) {
+  const used = data.goods.map((g) => g[field]).filter(Boolean);
+  const extra = [...new Set(used)].filter((v) => !standard.includes(v));
+  return [...standard, ...extra].slice(0, 9);
+}
+
+const RAMS = ['3', '4', '6', '8', '12', '16'];
+const MEMS = ['64 ГБ', '128 ГБ', '256 ГБ', '512 ГБ', '1 ТБ'];
+const COLORS = ['чёрный', 'белый', 'синий', 'зелёный', 'серый', 'золотой'];
+
+/**
+ * Поле с кнопками-подсказками и строкой ввода.
+ *
+ * Кнопки — на то, что приходит чаще всего: одно нажатие вместо
+ * набора. Строка рядом — на всё остальное, потому что завтра привезут
+ * 24 ГБ или цвет «полуночный», и упереться в чужой список нельзя.
+ * Нажатая повторно кнопка снимает выбор.
+ */
+function chips(field, values, chosen, подпись, подсказка) {
+  return `
+    <p class="q2" style="margin:0 0 6px">${подпись}</p>
+    <div class="cuts" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">
+      ${values.map((v) => `
+        <button class="cut" type="button" data-ngset="${field}" data-ngval="${esc(v)}"
+                aria-pressed="${chosen === v}">${esc(v)}</button>`).join('')}
+    </div>
+    <input id="ng-${field}" class="plainfld" value="${esc(chosen)}" placeholder="${подсказка}"
+           style="margin-bottom:12px" autocomplete="off">`;
+}
+
+/**
+ * Карточка нового товара.
+ *
+ * Название разложено на модель, память и цвет: в магазине телефонов
+ * это три разных вопроса, и набирать «iPhone 15 256 ГБ чёрный» одной
+ * строкой по двадцать раз — медленно и с опечатками. Память и цвет
+ * чаще всего выбираются нажатием, руками дописывают редкое.
+ */
+function sheetNewGood() {
+  const имя = ngName();
+  return `
+    <h3>Новый товар</h3>
+    ${ng.code
+      ? `<p class="q">Код <b class="n">${esc(ng.code)}</b> будет привязан к этому товару. Следующую такую же коробку достаточно будет пикнуть и выбрать из списка.</p>`
+      : '<p class="q">Заводим товар руками, без пикалки. Коды прибавятся сами, когда коробки начнут приходить.</p>'}
+
+    <label class="fld"><span>Модель</span>
+      <input id="ng-model" value="${esc(ng.model)}" placeholder="iPhone 15" autofocus></label>
+    ${ng.bad === 'model' ? '<p class="q2" style="color:var(--red);margin:-6px 0 10px">Без модели не обойтись.</p>' : ''}
+
+    ${chips('ram', hints('ram', RAMS), ng.ram, 'Оперативная память, ГБ', 'например, 24')}
+    ${chips('mem', hints('mem', MEMS), ng.mem, 'Память', 'например, 2 ТБ')}
+    ${chips('color', hints('color', COLORS), ng.color, 'Цвет', 'например, полуночный')}
+
+    <p class="q2" style="margin:-4px 0 14px">Получится: <b>${имя ? esc(имя) : '…'}</b></p>
+
+    <div class="cuts" style="margin-bottom:6px">
+      <button class="cut" type="button" data-ngserial="1" aria-pressed="${ng.serial}">У каждой штуки свой код (IMEI)</button>
+    </div>
+    <p class="q2" style="margin:0 0 14px">${ng.serial
+      ? 'Каждую коробку можно продать один раз: повторный пик того же кода не пройдёт.'
+      : 'Код один на все штуки (чехлы, стёкла): пикать можно сколько угодно, пока есть остаток.'}</p>
+
+    <div class="pair">
+      <label class="fld"><span>Пришло по, сом</span>
+        <input id="ng-cost" type="number" inputmode="numeric" value="${esc(ng.cost)}" placeholder="закуп"></label>
+      <label class="fld"><span>Наценка, %</span>
+        <input id="ng-markup" type="number" inputmode="numeric" value="${esc(ng.markup)}"></label>
+    </div>
+    ${ng.bad === 'cost' ? '<p class="q2" style="color:var(--red);margin:-6px 0 10px">Нужна цена, по которой пришло.</p>' : ''}
+
+    <label class="fld"><span>Продаём по, сом</span>
+      <input id="ng-price" type="number" inputmode="numeric" value="${esc(ng.price)}" placeholder="считается от наценки"></label>
+    <p class="q2">Наценка и цена связаны: меняете одно — пересчитывается другое.</p>
+    ${ng.bad === 'price' ? '<p class="q2" style="color:var(--red);margin:-6px 0 10px">Нужна цена продажи.</p>' : ''}
+
+    <label class="fld"><span>Сколько пришло, шт</span>
+      <input id="ng-qty" type="number" inputmode="numeric" value="${esc(ng.qty)}" min="1"></label>
+
+    <button class="btn" id="ng-save" type="button">Завести и принять</button>
+    <button class="btn line" data-shut="1" type="button">Отмена</button>`;
+}
+
+/**
+ * Название собирается из частей, пустые пропускаются.
+ *
+ * Оперативная и постоянная сливаются в привычное «8/256 ГБ»: так пишут
+ * на ценниках и так спрашивают покупатели. Если известна только одна,
+ * пишем её отдельно — «8 ГБ ОЗУ» или «256 ГБ».
+ */
+function ngName() {
+  const ram = String(ng.ram).trim();
+  const mem = String(ng.mem).trim();
+  const память = ram && mem ? `${ram}/${mem}` : ram ? `${ram} ГБ ОЗУ` : mem;
+  return [ng.model, память, ng.color].map((s) => String(s).trim()).filter(Boolean).join(' ');
+}
+
+/** Снять набранное из полей в черновик — перед любой перерисовкой листа. */
+function ngRead() {
+  if (!ng) return;
+  for (const [key, id] of [['model', 'ng-model'], ['ram', 'ng-ram'], ['mem', 'ng-mem'],
+                           ['color', 'ng-color'], ['cost', 'ng-cost'], ['markup', 'ng-markup'],
+                           ['price', 'ng-price'], ['qty', 'ng-qty']]) {
+    const field = document.getElementById(id);
+    if (field) ng[key] = field.value;
+  }
+}
+
+/**
+ * Скидка на весь чек.
+ *
+ * Сумму вводят руками: «скинь двести» звучит в магазине чаще, чем
+ * «скинь полтора процента», и считать проценты в уме за прилавком
+ * никто не станет. Кнопки рядом — на самые ходовые суммы.
+ */
+function sheetWhole() {
+  const t = total();
+  const построчно = t.off - t.whole;
+  const room = owner()
+    ? Math.max(0, t.gross - построчно)
+    : Math.max(0, Math.min(data.limit * t.count, t.gross) - построчно);
+
+  return `
+    <h3>Скидка на чек</h3>
+    <p class="q">К оплате сейчас ${som(t.due)}. Скидка задаётся в сомах, а не в процентах.</p>
+
+    <div class="chipsrow" style="margin-bottom:12px">
+      ${QUICK_OFF.filter((v) => v <= room).map((v) => `
+        <button class="chipx" type="button" data-setwhole="${v}" aria-pressed="${t.whole === v}">−${som(v)}</button>`).join('')}
+      ${t.whole ? '<button class="chipx" type="button" data-setwhole="0">убрать скидку</button>' : ''}
+    </div>
+
+    <div class="pair">
+      <label class="fld"><span>Скинуть, сом</span>
+        <input id="whole-value" type="number" inputmode="numeric" value="${t.whole}" min="0" max="${room}" autofocus></label>
+      <label class="fld"><span>Отдать за, сом</span>
+        <input id="whole-final" type="number" inputmode="numeric" value="${t.gross - t.off}"
+               min="${t.gross - построчно - room}" max="${t.gross - построчно}"></label>
+    </div>
+    <p class="q2">Можно задать любое из двух: впишете «отдать за 11 500» — скидка посчитается сама.</p>
+
+    ${owner()
+      ? '<p class="q2">Вы владелец, предел на вас не действует.</p>'
+      : `<p class="q2">Ваш предел — ${som(data.limit)} с позиции, на этот чек ${som(room)}${построчно ? ` (${som(построчно)} уже скинуто по строкам)` : ''}.</p>`}
+
+    <button class="btn" id="whole-save" type="button">Применить</button>
+    <button class="btn line" data-shut="1" type="button">Отмена</button>`;
+}
+
+/**
+ * Вход во владельца.
+ *
+ * Листом поверх кассы, а не отдельным экраном: продавец не должен
+ * видеть, как его смену закрывают ради чужих настроек. Отменил —
+ * и ты снова за прилавком, ничего не потеряно.
+ */
+function sheetOwnerPin() {
+  const setup = ownerSetup();
+  const подпись = setup ? (newPin === null ? 'дальше' : 'повторить') : 'войти';
+  const пояснение = setup
+    ? (newPin === null
+      ? (changing
+        ? 'Придумайте новый код — четыре цифры.'
+        : 'Кода ещё нет. Придумайте свой — четыре цифры. Он закрывает закупочные цены, выручку и настройки.')
+      : 'Наберите тот же код ещё раз.')
+    : 'Четыре цифры.';
+
+  return `
+    <h3>${setup ? (changing ? 'Новый код' : 'Код владельца') : 'Вход для владельца'}</h3>
+    <p class="q">${пояснение}</p>
+
+    <div class="pin" style="margin:0 0 14px">
+      ${[0, 1, 2, 3].map((i) => `<i data-on="${i < pin.length ? 1 : 0}"></i>`).join('')}
+    </div>
+
+    <div class="keys">
+      ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => `<button type="button" data-digit="${d}">${d}</button>`).join('')}
+      <button type="button" class="wide" data-digit="clear">стереть</button>
+      <button type="button" data-digit="0">0</button>
+      <button type="button" class="wide" data-digit="enter">${подпись}</button>
+    </div>
+
+    <button class="btn line" data-shut="1" type="button" style="margin-top:14px">Отмена</button>`;
+}
+
+function sheetTake(id) {
+  const g = good(id);
+  return `
+    <h3>${esc(g.name)}</h3>
+    <p class="q">Товар знакомый, на остатке ${g.stock} шт. Сколько пришло ещё?</p>
+    <div class="pair">
+      <label class="fld"><span>Пришло, шт</span><input id="tk-qty" type="number" inputmode="numeric" value="1" min="1"></label>
+      <label class="fld"><span>Пришло по, сом</span><input id="tk-cost" type="number" inputmode="numeric" value="${g.cost}"></label>
+    </div>
+    <div class="pair">
+      <label class="fld"><span>Наценка, %</span><input id="tk-markup" type="number" inputmode="numeric" value="${markup(g)}"></label>
+      <label class="fld"><span>Продаём по, сом</span><input id="tk-price" type="number" inputmode="numeric" value="${g.price}"></label>
+    </div>
+    <button class="btn" data-tksave="${id}" type="button">Принять</button>
+    <button class="btn line" data-shut="1" type="button">Отмена</button>`;
+}
+
+function sheetEdit(id) {
+  const g = good(id);
+  return `
+    <h3>${esc(g.name)}</h3>
+    <label class="fld"><span>Название</span><input id="ed-name" value="${esc(g.name)}"></label>
+
+    <p class="q2" style="margin:0 0 6px">${g.codes.length === 0
+      ? 'Коробки этого товара ещё не пикали.'
+      : `Кодов с коробок — ${g.codes.length}. Нажмите на код, чтобы отвязать.`}</p>
+    ${g.codes.length === 0 ? '' : `
+      <div class="cuts" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        ${g.codes.slice(-8).reverse().map((c) => `
+          <button class="cut n" type="button" data-uncode="${g.id}" data-code="${esc(c)}"
+                  title="Отвязать">${esc(c)} ×</button>`).join('')}
+      </div>
+      ${g.codes.length > 8 ? `<p class="q2" style="margin:-4px 0 10px">Показаны последние 8 из ${g.codes.length}.</p>` : ''}`}
+    <label class="fld"><span>Привязать ещё код</span>
+      <input id="ed-code" class="n" value="" placeholder="пикните или введите"></label>
+    <div class="pair">
+      <label class="fld"><span>Закуп, сом</span><input id="ed-cost" type="number" inputmode="numeric" value="${g.cost}"></label>
+      <label class="fld"><span>Продажа, сом</span><input id="ed-price" type="number" inputmode="numeric" value="${g.price}"></label>
+    </div>
+    <label class="fld"><span>Остаток, шт</span><input id="ed-stock" type="number" inputmode="numeric" value="${g.stock}" min="0"></label>
+    <div class="cuts" style="margin-bottom:10px">
+      <button class="cut" type="button" data-edserial="${g.id}" aria-pressed="${g.serial}">У каждой штуки свой код (IMEI)</button>
+    </div>
+    <p class="q2">Наценка сейчас ${markup(g)} %, с одной штуки зарабатываете ${som(g.price - g.cost)}.</p>
+    <button class="btn" data-edsave="${id}" type="button">Сохранить</button>
+    <button class="btn line" data-eddel="${id}" type="button">Убрать товар</button>
+    <button class="btn line" data-shut="1" type="button">Отмена</button>`;
+}
+
+function sheetCode() {
+  return `
+    <h3>Код руками</h3>
+    <p class="q">Если штрих-код затёрт или пикалка не достаёт.</p>
+    <label class="fld"><span>Штрих-код</span>
+      <input id="code-field" class="n" inputmode="numeric" placeholder="4870001234561" autofocus></label>
+    <button class="btn" id="code-go" type="button">Найти</button>
+    <button class="btn line" data-shut="1" type="button">Отмена</button>`;
+}
+
+function sheetPick() {
+  return `
+    <h3>Выбрать из списка</h3>
+    <div class="rows">
+      ${data.goods.map((g) => `
+        <div class="row">
+          <button class="plain grow" type="button" data-add="${g.id}" ${g.stock <= 0 ? 'disabled' : ''}>
+            <div class="t" style="${g.stock <= 0 ? 'color:var(--ink-3)' : ''}">${esc(g.name)}</div>
+            <div class="q2 n">${som(g.price)}, остаток ${g.stock}</div>
+          </button>
+          ${g.stock > 0 ? svg('plus', 18) : '<span class="tag nt">нет</span>'}
+        </div>`).join('')}
+    </div>
+    <button class="btn line" data-shut="1" type="button">Закрыть</button>`;
+}
+
+function sheetReceipt(id) {
+  const c = data.checks.find((x) => x.id === id);
+  return `
+    <h3>Чек</h3>
+    <div class="sheetpaper">
+      <h4>Товарный чек № ${c.id.replace(/\D/g, '') || '1'}</h4>
+      <div class="meta">${new Date(c.at).toLocaleString('ru-RU')}, продал ${esc(c.by)}</div>
+      <table>
+        <tr><th>Наименование</th><th class="r">Кол-во</th><th class="r">Цена</th><th class="r">Сумма</th></tr>
+        ${c.lines.map((l) => `<tr><td>${esc(l.name)}</td><td class="r">${l.qty}</td>
+          <td class="r">${som(l.price)}</td><td class="r">${som(l.price * l.qty - l.off)}</td></tr>
+          ${(l.codes ?? []).length === 0 ? '' : `
+            <tr><td colspan="4" class="meta" style="padding-top:0">
+              ${l.codes.length > 1 ? 'коробки' : 'коробка'}: ${l.codes.map(esc).join(', ')}
+            </td></tr>`}`).join('')}
+        ${c.off ? `<tr><td colspan="3">Скидка</td><td class="r">−${som(c.off)}</td></tr>` : ''}
+        <tr><td colspan="3"><b>Итого</b></td><td class="r"><b>${som(c.total)}</b></td></tr>
+      </table>
+      <p style="margin:10px 0 0">Обмен и возврат — по чеку в течение 14 дней.</p>
+    </div>
+    <button class="btn line" data-shut="1" type="button">Закрыть</button>`;
+}
+
+function sheetCam() {
+  return `
+    <h3>Камера</h3>
+    <p class="q">Наведите на штрих-код. Как только он прочитается, товар сам попадёт в чек.</p>
+    <div style="border:1px solid var(--rule);border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3">
+      <video id="cam-video" playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+    </div>
+    <p class="q2" id="cam-note" style="margin-top:10px">Запрашиваю доступ к камере…</p>
+    <button class="btn line" id="cam-close" type="button">Закрыть</button>`;
+}
+
+/** Камера живёт только пока открыт лист: иначе индикатор съёмки горит всегда. */
+async function camStart() {
+  const video = document.getElementById('cam-video');
+  const note = document.getElementById('cam-note');
+  if (!video) return;
+
+  try {
+    camera = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = camera;
+    await video.play();
+    note.textContent = 'Ищу штрих-код…';
+  } catch (error) {
+    note.textContent = 'Камера не открылась: ' + (error.name === 'NotAllowedError'
+      ? 'доступ не разрешён. Разрешите камеру в настройках браузера.'
+      : 'её нет или она занята другим приложением.');
+    return;
+  }
+
+  const detector = new BarcodeDetector();
+  const tick = async () => {
+    if (!camera || sheet?.k !== 'cam') return;
+    try {
+      const found = await detector.detect(video);
+      if (found.length) {
+        const code = found[0].rawValue;
+        camStop();
+        sheet = null;
+        render();
+        onScan(code);
+        return;
+      }
+    } catch (e) { /* кадр не разобрался — просто следующий */ }
+    setTimeout(tick, 250);
+  };
+  setTimeout(tick, 400);
+}
+
+function camStop() {
+  camera?.getTracks().forEach((t) => t.stop());
+  camera = null;
+}
+
+/* --------------------------------------------------------------- вывод */
+
+function render() {
+  document.getElementById('app').hidden = false;
+
+  document.getElementById('who').textContent = owner() ? 'Владелец' : me()?.name ?? 'Выберите имя';
+
+  const link = document.getElementById('link');
+  link.textContent = online ? 'в сети' : 'без сети';
+  // Не data-off: так зовётся кнопка скидки, и нажатие по указателю
+  // сети уводило бы в лист скидки несуществующей строки.
+  link.dataset.down = online ? '' : '1';
+
+  const main = document.getElementById('screen');
+  const keep = main.scrollTop;
+  main.innerHTML = tab === 'sale' ? viewSale()
+    : tab === 'intake' ? viewIntake()
+    : tab === 'report' ? viewReport()
+    : tab === 'goods' ? viewGoods()
+    : tab === 'checks' ? viewChecks()
+    : viewMore();
+  main.scrollTop = keep;
+
+  const tabs = TABS[owner() ? 'owner' : 'cashier'];
+  if (!tabs.some((t) => t.id === tab)) tab = 'sale';
+  document.getElementById('nav').innerHTML = tabs.map((t) =>
+    `<button type="button" data-tab="${t.id}" aria-selected="${t.id === tab}">${svg(t.icon)}${t.text}</button>`).join('');
+
+  const t = total();
+  const till = document.getElementById('till');
+  till.hidden = !(tab === 'sale' && t.count > 0);
+  if (!till.hidden) {
+    till.innerHTML = `
+      <div class="till-head">
+        <span class="lines">${t.count} ${plural(t.count, 'штука', 'штуки', 'штук')} в чеке</span>
+        <span class="gross n ${t.off ? 'struck' : ''}">${som(t.gross)}</span>
+      </div>
+      <div class="due"><span class="lbl">К оплате</span><span class="amt${settle ? ' settle' : ''}">${som(t.due)}</span></div>
+      <button class="sell" type="button" id="sell">${svg('check')}Продать</button>`;
+    settle = false;
+  }
+
+  const host = document.getElementById('sheet');
+  if (!sheet) { host.innerHTML = ''; return; }
+  const body = sheet.k === 'ownerpin' ? sheetOwnerPin()
+    : sheet.k === 'off' ? sheetOff(sheet.id)
+    : sheet.k === 'whole' ? sheetWhole()
+    : sheet.k === 'newcode' ? sheetNewCode(sheet.code)
+    : sheet.k === 'newgood' ? sheetNewGood()
+    : sheet.k === 'take' ? sheetTake(sheet.id)
+    : sheet.k === 'edit' ? sheetEdit(sheet.id)
+    : sheet.k === 'code' ? sheetCode()
+    : sheet.k === 'pick' ? sheetPick()
+    : sheet.k === 'receipt' ? sheetReceipt(sheet.id)
+    : sheet.k === 'cam' ? sheetCam()
+    : '';
+  host.innerHTML = `<div class="veil" data-veil="1"><div class="sheet"><div class="grip"></div>${body}</div></div>`;
+
+  const field = document.getElementById('code-field');
+  if (field) field.focus();
+
+  // Подсказки графиков вешаются на общий слой, а не на каждый столбец.
+  if (tab === 'report') wireTips(document.getElementById('charts'));
+
+  if (sheet?.k === 'cam' && !camera) void camStart();
+}
+
+/* ------------------------------------------------------------ действия */
+
+function sell() {
+  const t = total();
+  if (t.count === 0) return;
+  if (needName()) return;
+
+  // Последняя проверка перед списанием: остаток мог измениться, пока чек лежал.
+  for (const l of check) {
+    const g = good(l.id);
+    if (l.qty > g.stock) return flash(`${g.name}: на остатке ${g.stock} шт, в чеке ${l.qty}`);
+    for (const code of g.serial ? l.codes ?? [] : []) {
+      if (data.sold[code]) return flash(`Коробка ${code} уже продана`);
+    }
+  }
+
+  const at = Date.now();
+  const id = 'c' + at;
+  const lines = check.map((l) => {
+    const g = good(l.id);
+    g.stock = Math.max(0, g.stock - l.qty);
+    if (g.serial) for (const code of l.codes ?? []) data.sold[code] = { at, id };
+    return { name: g.name, price: g.price, qty: l.qty, off: l.off, codes: l.codes ?? [] };
+  });
+
+  const entry = { id, at, by: sellerName(), byId: owner() ? 'owner' : me().id,
+    total: t.due, cost: t.cost, off: t.off, lines };
+  data.checks.push(entry);
+
+  check = [];
+  checkOff = 0;
+  save();
+  sheet = { k: 'receipt', id: entry.id };
+  render();
+  flash('Продано на ' + som(t.due));
+}
+
+document.addEventListener('click', (event) => {
+  const el = event.target.closest('button, [data-veil]');
+  if (!el) return;
+
+  /**
+   * Нажатие мимо кнопок внутри листа — не нажатие по затемнению.
+   *
+   * Лист лежит внутри затемнения, и поиск вверх по дереву от поля ввода
+   * доходил до него: касание «Названия» засчитывалось как «ткнул мимо
+   * окна» и окно закрывалось. Заполнить карточку было нельзя.
+   */
+  if (el.dataset.veil && event.target.closest('.sheet')) return;
+
+  const d = el.dataset ?? {};
+
+  /* экран входа */
+  if (d.digit) {
+    if (d.digit === 'clear') { pin = ''; return render(); }
+    if (d.digit === 'enter') {
+      if (ownerSetup()) return makeOwnerPin();
+      const who = whoFor(pin);
+      if (who) return letIn(who);
+      pin = '';
+      render();
+      return flash('Код не подошёл');
+    }
+    if (pin.length < 4) pin += d.digit;
+    // Четыре цифры — проверяем сразу, не дожидаясь кнопки: так быстрее,
+    // а длиннее четырёх кодов тут всё равно не бывает.
+    if (pin.length === 4) {
+      if (ownerSetup()) return makeOwnerPin();
+      const who = whoFor(pin);
+      if (who) return letIn(who);
+      // Промахнулся — начинаем заново. Иначе четыре неверные цифры
+      // запирают клавиатуру: класть пятую некуда, и человек тычет
+      // в кнопки, не понимая, почему ничего не происходит.
+      pin = '';
+      render();
+      return flash('Код не подошёл');
+    }
+    return render();
+  }
+  /* вход и выход владельца */
+  if (el.id === 'owner-in') { pin = ''; newPin = null; changing = false; sheet = { k: 'ownerpin' }; return render(); }
+  if (el.id === 'pin-change') { pin = ''; newPin = null; changing = true; sheet = { k: 'ownerpin' }; return render(); }
+  if (el.id === 'owner-out') {
+    signed = 'cashier'; data.role = 'cashier'; tab = 'sale'; sellerId = null;
+    save(); render();
+    return flash('Вы снова за кассой');
+  }
+
+  if (d.veil && el.classList.contains('veil')) { camStop(); sheet = null; return render(); }
+  if (d.shut) {
+    camStop();
+    // Передумали вводить код — черновик ввода не должен пережить закрытие.
+    pin = ''; newPin = null; changing = false;
+    sheet = null;
+    return render();
+  }
+  if (el.id === 'cam-open') { sheet = { k: 'cam' }; return render(); }
+  if (el.id === 'cam-close') { camStop(); sheet = null; return render(); }
+  if (d.tab) { tab = d.tab; sheet = null; render(); document.getElementById('screen').scrollTop = 0; return; }
+
+  /* кто за кассой */
+  if (d.who) {
+    const s = data.staff.find((x) => x.id === d.who);
+    if (!s) return;
+    sellerId = s.id;
+    render();
+    return flash(`Здравствуйте, ${s.name}`);
+  }
+  if (el.id === 'who-change') {
+    if (check.length) return flash('Сначала закончите или отмените чек');
+    sellerId = null; tab = 'sale';
+    return render();
+  }
+  if (el.id === 'staff-add') {
+    const name = document.getElementById('staff-name').value.trim().replace(/\s+/g, ' ');
+    if (!name) return flash('Впишите имя');
+    if (name.toLowerCase() === 'владелец' || data.staff.some((x) => x.name.toLowerCase() === name.toLowerCase())) {
+      return flash(`Имя «${name}» уже занято`);
+    }
+    data.staff.push({ id: 's' + Date.now(), name });
+    save(); render();
+    return flash(`${name} добавлен(а) на кассу`);
+  }
+  if (d.staffdel) {
+    const s = data.staff.find((x) => x.id === d.staffdel);
+    if (!s) return;
+    data.staff = data.staff.filter((x) => x.id !== s.id);
+    if (sellerId === s.id) sellerId = null;
+    save(); render();
+    return flash(`${s.name} убран(а). Прошлые чеки остаются`);
+  }
+
+  /* продажа */
+  if (d.add) {
+    if (needName()) return;
+    const g = good(d.add);
+    if (!g || g.stock <= 0) return flash('На остатке ноль');
+    if (!addLine(d.add)) return;
+    settle = true;
+    if (sheet?.k === 'pick') sheet = null;
+    return render();
+  }
+  if (d.less) {
+    const l = check.find((x) => x.id === d.less);
+    l.qty -= 1;
+    if (l.qty <= 0) check = check.filter((x) => x.id !== d.less);
+    else l.off = Math.min(l.off, good(d.less).price * l.qty);
+    settle = true; return render();
+  }
+  if (el.id === 'check-drop') { check = []; checkOff = 0; return render(); }
+  if (el.id === 'sell') return sell();
+
+  /* скидка в сомах */
+  if (el.id === 'whole-off') { sheet = { k: 'whole' }; return render(); }
+  if (d.setwhole !== undefined) { checkOff = Number(d.setwhole); return render(); }
+  if (el.id === 'whole-save') {
+    const t = total();
+    const построчно = t.off - t.whole;
+    const room = owner()
+      ? Math.max(0, t.gross - построчно)
+      : Math.max(0, Math.min(data.limit * t.count, t.gross) - построчно);
+
+    const typedOff = Number(document.getElementById('whole-value').value);
+    const typedFinal = Number(document.getElementById('whole-final').value);
+    // Что изменили, то и слушаем: «отдать за» удобнее при торге.
+    const want = typedOff !== t.whole ? typedOff : t.gross - построчно - typedFinal;
+    const off = Math.max(0, Math.round(want));
+
+    if (off > room) {
+      return flash(owner()
+        ? `Больше ${som(room)} скинуть нельзя`
+        : `Ваш предел на этот чек — ${som(room)}. Позовите владельца`);
+    }
+    checkOff = off;
+    sheet = null; settle = true; return render();
+  }
+
+  if (d.off) { sheet = { k: 'off', id: d.off }; return render(); }
+  if (d.setoff) {
+    const l = check.find((x) => x.id === d.setoff);
+    l.off = Number(d.v);
+    return render();
+  }
+  if (d.offsave) {
+    const l = check.find((x) => x.id === d.offsave);
+    const g = good(d.offsave);
+    const sum = g.price * l.qty;
+    const cap = owner() ? sum : Math.min(data.limit * l.qty, sum);
+
+    const typedOff = Number(document.getElementById('off-value').value);
+    const typedFinal = Number(document.getElementById('off-final').value);
+    // Что изменили, то и слушаем: «отдать за» удобнее при торге.
+    const want = typedOff !== l.off ? typedOff : sum - typedFinal;
+    const off = Math.max(0, Math.round(want));
+
+    if (off > cap) {
+      return flash(owner()
+        ? `Больше ${som(sum)} скинуть нельзя`
+        : `Ваш предел — ${som(cap)}. Позовите владельца`);
+    }
+    l.off = off;
+    sheet = null; settle = true; return render();
+  }
+
+  /* сканер вручную и список */
+  if (el.id === 'code-manual') { sheet = { k: 'code' }; return render(); }
+  if (el.id === 'pick-list') { sheet = { k: 'pick' }; return render(); }
+  if (el.id === 'code-go') {
+    const code = document.getElementById('code-field').value.trim();
+    if (!code) return flash('Введите код');
+    sheet = null; render();
+    return onScan(code);
+  }
+
+  /* приём */
+  const ngFresh = (code) => ({ code, model: '', ram: '', mem: '', color: '',
+                               cost: '', markup: 100, price: '', qty: 1, bad: null, serial: true });
+
+  if (el.id === 'good-new') { ng = ngFresh(''); sheet = { k: 'newgood' }; return render(); }
+  if (el.id === 'ng-open') { ng = ngFresh(sheet?.code ?? ''); sheet = { k: 'newgood' }; return render(); }
+  if (el.id === 'pick-clear') { pick = ''; return render(); }
+
+  // Коробка той же модели: код прибавляется к товару, остаток растёт.
+  if (d.attach) {
+    const g = good(d.attach);
+    const code = sheet?.code;
+    if (code && !g.codes.includes(code)) g.codes.push(code);
+    // Кодов за год набегают сотни, а нужны только для узнавания.
+    if (g.codes.length > 300) g.codes = g.codes.slice(-300);
+    g.stock += 1;
+    g.at = Date.now();
+    sheet = null; save(); render();
+    return flash(`${g.name}: стало ${g.stock} шт`);
+  }
+
+  // Кнопка-подсказка памяти или цвета: повторное нажатие снимает выбор.
+  if (d.ngserial) { ngRead(); ng.serial = !ng.serial; return render(); }
+  if (d.ngset) {
+    ngRead();
+    ng[d.ngset] = ng[d.ngset] === d.ngval ? '' : d.ngval;
+    return render();
+  }
+  if (el.id === 'ng-save') {
+    ngRead();
+    const name = ngName();
+    const cost = Number(ng.cost);
+    const price = Number(ng.price);
+    const qty = Math.max(1, Number(ng.qty) || 1);
+
+    // Промах показываем у самого поля: подпись внизу экрана, в трёхстах
+    // точках от кнопки, человек просто не замечает — и решает, что
+    // программа не работает.
+    ng.bad = !ng.model.trim() ? 'model' : !(cost > 0) ? 'cost' : !(price > 0) ? 'price' : null;
+    if (ng.bad) { render(); return; }
+
+    const same = data.goods.find((g) => g.name.toLowerCase() === name.toLowerCase());
+    if (same) {
+      ng.bad = 'model';
+      render();
+      return flash(`«${same.name}» уже заведён — выберите его в списке`);
+    }
+
+    data.goods.push({
+      id: 'g' + Date.now(),
+      codes: ng.code ? [ng.code] : [],
+      name,
+      model: ng.model.trim(),
+      ram: String(ng.ram).trim(),
+      mem: String(ng.mem).trim(),
+      color: String(ng.color).trim(),
+      cost, price,
+      serial: ng.serial,
+      stock: qty,
+      at: Date.now(),
+    });
+    ng = null;
+    sheet = null; save(); render();
+    return flash(`${name}: принято ${qty} шт, наценка ${Math.round(((price - cost) / cost) * 100)}%`);
+  }
+  if (d.tksave) {
+    const g = good(d.tksave);
+    const qty = Number(document.getElementById('tk-qty').value) || 1;
+    g.stock += Math.max(1, qty);
+    g.cost = Number(document.getElementById('tk-cost').value) || g.cost;
+    g.price = Number(document.getElementById('tk-price').value) || g.price;
+    g.at = Date.now();
+    sheet = null; save(); render();
+    return flash(`${g.name}: стало ${g.stock} шт`);
+  }
+  if (d.edit) { sheet = { k: 'edit', id: d.edit }; return render(); }
+  if (d.edserial) {
+    const g = good(d.edserial);
+    g.serial = !g.serial;
+    save(); return render();
+  }
+  if (d.edsave) {
+    const g = good(d.edsave);
+    const name = document.getElementById('ed-name').value.trim();
+    const code = document.getElementById('ed-code').value.trim();
+    if (!name) return flash('Нужно название');
+    if (code) {
+      const other = byCode(code);
+      if (other && other.id !== g.id) return flash(`Этот код уже у товара «${other.name}»`);
+      if (!g.codes.includes(code)) g.codes.push(code);
+    }
+    g.name = name;
+    g.cost = Number(document.getElementById('ed-cost').value) || g.cost;
+    g.price = Number(document.getElementById('ed-price').value) || g.price;
+    g.stock = Math.max(0, Number(document.getElementById('ed-stock').value) || 0);
+    sheet = null; save(); render();
+    return flash('Сохранено');
+  }
+  if (d.uncode) {
+    const g = good(d.uncode);
+    g.codes = g.codes.filter((c) => c !== d.code);
+    save(); render();
+    return flash('Код отвязан');
+  }
+  if (d.eddel) {
+    data.goods = data.goods.filter((g) => g.id !== d.eddel);
+    check = check.filter((l) => l.id !== d.eddel);
+    sheet = null; save(); render();
+    return flash('Товар убран');
+  }
+
+  /* чеки */
+  if (el.id === 'xlsx') {
+    const result = exportWorkbook();
+    return flash(result.ok
+      ? (DESK ? 'Книга сохранена: ' + result.where : 'Книга скачивается')
+      : 'Выгрузить не вышло — здесь браузер не даёт сохранять файлы');
+  }
+  if (d.receipt) { sheet = { k: 'receipt', id: d.receipt }; return render(); }
+
+  /* настройки */
+  if (el.id === 'limit-save') {
+    data.limit = Math.max(0, Number(document.getElementById('limit').value) || 0);
+    save(); render();
+    return flash(`Предел скидки кассира — ${som(data.limit)}`);
+  }
+  if (el.id === 'q-clear') { search = ''; return render(); }
+  if (el.id === 'note-save') {
+    const text = document.getElementById('note-in').value.trim();
+    if (!text) return flash('Напишите замечание');
+    data.notes.push(text); save(); render();
+    return flash('Записано');
+  }
+  if (d.nodrop) { data.notes.splice(Number(d.nodrop), 1); save(); return render(); }
+  if (el.id === 'note-copy') {
+    const text = data.notes.map((n, i) => `${i + 1}. ${n}`).join('\n');
+    navigator.clipboard?.writeText(text).then(
+      () => flash('Скопировано, можно отправлять'),
+      () => flash('Скопировать не вышло — выделите текст мышкой'));
+    return;
+  }
+  if (el.id === 'auto-toggle') {
+    const стало = DESK.autoSet(!DESK.autoGet());
+    render();
+    return flash(стало ? 'Касса будет открываться при включении' : 'Открывать придётся вручную');
+  }
+  if (el.id === 'open-folder') { DESK?.reveal(); return; }
+  if (el.id === 'backup') {
+    const name = DESK?.backup();
+    return flash(name ? 'Копия сделана: ' + name : 'Копию сделать не вышло');
+  }
+  if (el.id === 'install') {
+    if (!installer) return flash('Браузер не предлагает установку — откройте в Chrome или Edge');
+    installer.prompt();
+    installer.userChoice.then((choice) => {
+      installer = null;
+      render();
+      flash(choice.outcome === 'accepted' ? 'Касса установлена' : 'Установку отменили');
+    });
+    return;
+  }
+  if (el.id === 'reset') {
+    data = freshData();
+    if (pinned) data.role = pinned;
+    check = []; sheet = null; search = ''; lastScan = null;
+    save(); render();
+    return flash('Демонстрация вернулась в исходный вид');
+  }
+});
+
+/* Наценка и цена ходят парой: меняешь одно — пересчитывается второе. */
+document.addEventListener('input', (event) => {
+  const id = event.target.id;
+
+  // Отбор перерисовывает список под полем, поэтому возвращаем в поле
+  // и место ввода: иначе с третьей буквы курсор прыгает в начало.
+  for (const [поле, запись] of [['q', (v) => { search = v; }], ['pick-q', (v) => { pick = v; }]]) {
+    if (id !== поле) continue;
+    запись(event.target.value);
+    const pos = event.target.selectionStart;
+    render();
+    const field = document.getElementById(поле);
+    if (field) { field.focus(); field.setSelectionRange(pos, pos); }
+    return;
+  }
+
+  const pairs = { 'ng-cost': 'ng', 'ng-markup': 'ng', 'ng-price': 'ng', 'tk-cost': 'tk', 'tk-markup': 'tk', 'tk-price': 'tk' };
+  const p = pairs[id];
+  if (!p) return;
+
+  const cost = Number(document.getElementById(`${p}-cost`)?.value);
+  const markupField = document.getElementById(`${p}-markup`);
+  const priceField = document.getElementById(`${p}-price`);
+  if (!(cost > 0) || !markupField || !priceField) return;
+
+  if (id === `${p}-price`) {
+    const price = Number(priceField.value);
+    markupField.value = price > 0 ? Math.round(((price - cost) / cost) * 100) : '';
+  } else {
+    const m = Number(markupField.value);
+    priceField.value = Number.isFinite(m) ? Math.round(cost * (1 + m / 100)) : '';
+  }
+});
+
+/* ---------------------------------------------------- работа без сети */
+
+function linkChanged() {
+  online = navigator.onLine;
+  render();
+  flash(online ? 'Интернет вернулся' : 'Интернета нет. Касса работает, данные останутся здесь');
+}
+window.addEventListener('online', linkChanged);
+window.addEventListener('offline', linkChanged);
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  // Браузер готов поставить программу: перехватываем приглашение,
+  // чтобы показать свою кнопку в понятном месте, а не ждать его подсказки.
+  event.preventDefault();
+  installer = event;
+  if (tab === 'more') render();
+});
+
+window.addEventListener('appinstalled', () => {
+  installer = null;
+  if (tab === 'more') render();
+  flash('Касса установлена, запускайте с рабочего стола');
+});
+
+async function offlineReady() {
+  const state = document.getElementById('sw-state');
+  const note = document.getElementById('install-note');
+  const button = document.getElementById('install');
+
+  if (button) {
+    const standalone = matchMedia('(display-mode: standalone)').matches;
+    button.hidden = !installer || standalone;
+    if (note) {
+      note.textContent = standalone
+        ? 'Уже запущена как программа.'
+        : installer
+          ? ''
+          : 'Если кнопки нет: в Chrome или Edge откройте меню и выберите «Установить».';
+    }
+  }
+
+  if (!state) return;
+  if (!('serviceWorker' in navigator)) {
+    state.textContent = 'этот браузер офлайн не умеет';
+    return;
+  }
+  const reg = await navigator.serviceWorker.getRegistration();
+  state.textContent = reg?.active ? 'страницы сохранены, откроется без интернета' : 'готовлю…';
+}
+
+if ('serviceWorker' in navigator) {
+  // На локальном файле и внутри встроенных окон регистрация запрещена —
+  // это нормально, касса просто останется обычной страницей.
+  navigator.serviceWorker.register('./sw.js').then(
+    () => { if (tab === 'more') render(); },
+    () => undefined,
+  );
+}
+
+const paint = render;
+render = function () { paint(); void offlineReady(); };
+
+render();
+</script>
+
+</body>
+</html>

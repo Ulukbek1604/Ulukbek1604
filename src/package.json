@@ -1,0 +1,54 @@
+{
+  "name": "kassa-telefony",
+  "version": "1.0.0",
+  "description": "Касса магазина телефонов и чехлов",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable --publish never",
+    "dist:setup": "electron-builder --win nsis --publish never"
+  },
+  "build": {
+    "appId": "kg.demo.kassa",
+    "productName": "Касса",
+    "directories": {
+      "output": "../dist-exe"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "kassa.html",
+      "icon-512.png",
+      "ключи.js",
+      "ключ.html"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "icon-512.png"
+    },
+    "portable": {
+      "artifactName": "Касса.exe"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "menuCategory": false,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "Касса",
+      "artifactName": "Kassa-Setup-${version}.exe"
+    },
+    "compression": "normal"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "author": "Elifsyndicate"
+}
