@@ -1315,6 +1315,8 @@ const SEED = {
    * через придумывание кода, а не мимо него.
    */
   accounts: { owner: '', cashier: '' },
+  /** Промахи на входе владельца: сколько подряд и до какого времени ждать. */
+  pinLock: null,
   /**
    * Люди на кассе. Владелец заводит их в «Ещё»; кассир перед продажей
    * нажимает своё имя, и чек записывается на него.
@@ -1394,25 +1396,138 @@ let pick = '';
  */
 let ng = null;
 
+/* ------------------------------------------------------------ PIN владельца */
+
 /**
- * Запасной код.
- *
- * Владелец меняет коды сам и может их забыть — а касса стоит в его
- * магазине, данные лежат только в ней, и войти больше нечем. Этот код
- * знает тот, кто кассу ставил, и пускает он владельцем, какие бы коды
- * ни были заданы. На экране его нет и быть не должно.
+ * SHA-256 на чистом JS: код проверяется синхронно, а WebCrypto отвечает
+ * обещанием, из-за чего пришлось бы переписывать весь вход.
  */
-const SPARE = '1604';
+const SHA_K = new Uint32Array([
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+]);
+
+function sha256(bytes) {
+  const h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+  const len = bytes.length;
+  const padded = new Uint8Array(((len + 9 + 63) >> 6) << 6);
+  padded.set(bytes);
+  padded[len] = 0x80;
+  const view = new DataView(padded.buffer);
+  view.setUint32(padded.length - 8, Math.floor((len * 8) / 0x100000000));
+  view.setUint32(padded.length - 4, (len * 8) >>> 0);
+  const w = new Uint32Array(64);
+  const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let off = 0; off < padded.length; off += 64) {
+    for (let i = 0; i < 16; i += 1) w[i] = view.getUint32(off + i * 4);
+    for (let i = 16; i < 64; i += 1) {
+      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+    }
+    let [a, b, c, d, e, f, g, hh] = h;
+    for (let i = 0; i < 64; i += 1) {
+      const t1 = (hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + SHA_K[i] + w[i]) >>> 0;
+      const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+      hh = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+  }
+  const out = new Uint8Array(32);
+  const o = new DataView(out.buffer);
+  for (let i = 0; i < 8; i += 1) o.setUint32(i * 4, h[i]);
+  return out;
+}
+
+const toHex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+const fromHex = (hex) => Uint8Array.from(hex.match(/../g) ?? [], (x) => parseInt(x, 16));
+
+/** Сколько раз перемешиваем: каждая проверка кода стоит заметного времени. */
+const PIN_ROUNDS = 30000;
+
+/** Хеш кода с солью: `x = sha256(соль + код)`, затем много раз `sha256(x + соль + код)`. */
+function pinDigest(code, saltHex) {
+  const salt = fromHex(saltHex);
+  const pinBytes = new TextEncoder().encode(String(code));
+  const join = (...parts) => {
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let at = 0;
+    for (const part of parts) { out.set(part, at); at += part.length; }
+    return out;
+  };
+  let x = sha256(join(salt, pinBytes));
+  for (let i = 0; i < PIN_ROUNDS; i += 1) x = sha256(join(x, salt, pinBytes));
+  return toHex(x);
+}
+
+/** Запись для файла: код открытым текстом там не лежит. */
+function pinPack(code) {
+  const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
+  return `v1:${salt}:${pinDigest(code, salt)}`;
+}
+
+function pinMatches(code, packed) {
+  const [version, salt, digest] = String(packed ?? '').split(':');
+  if (version !== 'v1' || !salt || !digest) return false;
+  const got = pinDigest(code, salt);
+  // Сравниваем целиком, без раннего выхода: время ответа не выдаёт верные цифры.
+  let diff = got.length ^ digest.length;
+  for (let i = 0; i < got.length; i += 1) diff |= got.charCodeAt(i) ^ (digest.charCodeAt(i) || 0);
+  return diff === 0;
+}
+
+/** Пять промахов подряд — ждём; каждые следующие пять ждать вдвое дольше, до 15 минут. */
+const PIN_TRIES = 5;
+function pinWait() {
+  const lock = data.pinLock;
+  return lock && lock.until > Date.now() ? Math.ceil((lock.until - Date.now()) / 1000) : 0;
+}
+function pinFailed() {
+  const fails = (data.pinLock?.fails ?? 0) + 1;
+  const wait = fails % PIN_TRIES === 0
+    ? Math.min(15 * 60, 60 * 2 ** (fails / PIN_TRIES - 1)) * 1000
+    : 0;
+  data.pinLock = { fails, until: wait ? Date.now() + wait : 0 };
+  save();
+  return wait;
+}
+
+/** Прежняя версия хранила код открытым текстом; при чтении он заменяется хешем. */
+let pinMigrated = false;
 
 /** Кода владельца ещё нет (или его меняют) — спрашиваем дважды. */
 const ownerSetup = () => changing || !data.accounts.owner;
 
 /** Кого пускаем с этим набором цифр. null — никого. */
 function whoFor(value) {
-  if (value === SPARE) return 'owner';
   // Пустой код владельца — не «вход без кода», а «кода ещё нет».
   if (ownerSetup()) return null;
-  return value === data.accounts.owner ? 'owner' : null;
+  if (!pinMatches(value, data.accounts.owner)) return null;
+  data.pinLock = null;
+  return 'owner';
+}
+
+/** Ввод четырёх цифр на входе владельца: пустить, отказать или попросить подождать. */
+function tryOwnerPin() {
+  const wait = pinWait();
+  if (wait) {
+    pin = ''; render();
+    return flash(`Слишком много попыток. Подождите ${wait} с`);
+  }
+  const who = whoFor(pin);
+  if (who) return letIn(who);
+  const now = pinFailed();
+  pin = '';
+  render();
+  if (now) return flash(`Код не подошёл. Следующая попытка через ${Math.round(now / 1000)} с`);
+  const left = PIN_TRIES - ((data.pinLock?.fails ?? 0) % PIN_TRIES);
+  return flash(`Код не подошёл. Осталось попыток: ${left}`);
 }
 
 /** Пустить внутрь и поздороваться. */
@@ -1436,11 +1551,6 @@ function letIn(who) {
  * которого у него нет.
  */
 function makeOwnerPin() {
-  // Запасной код сюда тоже годится: он пускает, а не заводит новый код.
-  // Побочно это не даёт выбрать его себе и получить два смысла у одних
-  // и тех же цифр.
-  if (pin === SPARE) return letIn('owner');
-
   if (pin.length !== 4) { render(); return flash('Нужно четыре цифры'); }
 
   if (newPin === null) {
@@ -1457,7 +1567,8 @@ function makeOwnerPin() {
     return flash('Коды не совпали — наберите заново');
   }
 
-  data.accounts = { ...data.accounts, owner: pin };
+  data.accounts = { ...data.accounts, owner: pinPack(pin) };
+  data.pinLock = null;
   letIn('owner');
   return flash('Код сохранён');
 }
@@ -1494,6 +1605,12 @@ function fixUp(d) {
     // Телефоны и прочее с памятью — штучный товар, код на каждой коробке свой.
   }
   if (typeof d.limitOn !== 'boolean') d.limitOn = true;
+  if (!d.accounts || typeof d.accounts !== 'object') d.accounts = { owner: '', cashier: '' };
+  if (/^\d{4}$/.test(String(d.accounts.owner ?? ''))) {
+    d.accounts.owner = pinPack(d.accounts.owner);
+    pinMigrated = true;
+  }
+  if (!d.pinLock || typeof d.pinLock.fails !== 'number') d.pinLock = null;
   if (!Array.isArray(d.intakes)) d.intakes = [];
   if (typeof d.shopName !== 'string' || !d.shopName.trim()) d.shopName = 'Телефоны и чехлы';
   if (!Array.isArray(d.inventories)) d.inventories = [];
@@ -1562,6 +1679,7 @@ function freshData() {
 }
 
 let data = load();
+if (pinMigrated) save();
 // Программа открывается кассой: продавец утром включает ноутбук и сразу
 // работает. Во владельца переходят отдельно и по коду.
 signed = pinned ?? 'cashier';
@@ -2748,7 +2866,24 @@ function sheetOwnerPin() {
       <button type="button" class="wide" data-digit="enter">${подпись}</button>
     </div>
 
+    ${DESK && !setup ? '<button class="plain q2" id="pin-forgot" type="button" style="margin-top:12px;width:auto">Забыли код?</button>' : ''}
     <button class="btn line" data-shut="1" type="button" style="margin-top:14px">Отмена</button>`;
+}
+
+/**
+ * Сброс забытого кода. Отпечаток компьютера уходит тому, кто ставил кассу,
+ * а в ответ приходит код сброса: он годится только для этого компьютера.
+ */
+function sheetPinReset() {
+  return `
+    <h3>Сброс кода владельца</h3>
+    <p class="q">Назовите тому, кто устанавливал кассу, код этого компьютера и введите код сброса, который он продиктует. Данные магазина не пострадают.</p>
+    <div class="label q2">Код этого компьютера</div>
+    <p class="t n" style="font-size:18px;letter-spacing:.06em;margin:4px 0 14px">${esc(window.ключ?.отпечаток?.() ?? '')}</p>
+    <label class="fld"><span>Код сброса</span>
+      <input id="rc-code" class="n" placeholder="XXXXX-XXXXX-XXXXX-XXXXX" autocomplete="off" spellcheck="false" autofocus></label>
+    <button class="btn" id="rc-go" type="button">Сбросить код</button>
+    <button class="btn line" data-shut="1" type="button">Отмена</button>`;
 }
 
 function sheetTake(id) {
@@ -3130,6 +3265,7 @@ function render() {
   const host = document.getElementById('sheet');
   if (!sheet) { host.innerHTML = ''; return; }
   const body = sheet.k === 'ownerpin' ? sheetOwnerPin()
+    : sheet.k === 'pinreset' ? sheetPinReset()
     : sheet.k === 'off' ? sheetOff(sheet.id)
     : sheet.k === 'whole' ? sheetWhole()
     : sheet.k === 'newcode' ? sheetNewCode(sheet.code)
@@ -3215,28 +3351,32 @@ document.addEventListener('click', (event) => {
     if (d.digit === 'clear') { pin = ''; return render(); }
     if (d.digit === 'enter') {
       if (ownerSetup()) return makeOwnerPin();
-      const who = whoFor(pin);
-      if (who) return letIn(who);
-      pin = '';
-      render();
-      return flash('Код не подошёл');
+      return tryOwnerPin();
     }
     if (pin.length < 4) pin += d.digit;
     // Четыре цифры — проверяем сразу, не дожидаясь кнопки: так быстрее,
-    // а длиннее четырёх кодов тут всё равно не бывает.
+    // а длиннее четырёх кодов тут всё равно не бывает. Промахнулся —
+    // начинаем заново, иначе клавиатура заперта четырьмя неверными цифрами.
     if (pin.length === 4) {
       if (ownerSetup()) return makeOwnerPin();
-      const who = whoFor(pin);
-      if (who) return letIn(who);
-      // Промахнулся — начинаем заново. Иначе четыре неверные цифры
-      // запирают клавиатуру: класть пятую некуда, и человек тычет
-      // в кнопки, не понимая, почему ничего не происходит.
-      pin = '';
-      render();
-      return flash('Код не подошёл');
+      return tryOwnerPin();
     }
     return render();
   }
+  /* забытый код владельца */
+  if (el.id === 'pin-forgot') { sheet = { k: 'pinreset' }; return render(); }
+  if (el.id === 'rc-go') {
+    const code = document.getElementById('rc-code').value;
+    if (!DESK || !DESK.recover(code)) return flash('Код сброса не подошёл');
+    data.accounts = { ...data.accounts, owner: '' };
+    data.pinLock = null;
+    pin = ''; newPin = null; changing = false;
+    save();
+    sheet = { k: 'ownerpin' };
+    render();
+    return flash('Код сброшен. Придумайте новый');
+  }
+
   /* вход и выход владельца */
   if (el.id === 'owner-in') { pin = ''; newPin = null; changing = false; sheet = { k: 'ownerpin' }; return render(); }
   if (el.id === 'pin-change') { pin = ''; newPin = null; changing = true; sheet = { k: 'ownerpin' }; return render(); }

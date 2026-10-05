@@ -3,7 +3,7 @@
 /**
  * Мостик между окном и программой.
  *
- * Наружу отдаётся ровно восемь действий и ничего больше: страница не должна
+ * Наружу отдаётся ровно девять действий и ничего больше: страница не должна
  * уметь читать произвольные файлы на машине, даже своя собственная.
  *
  * Окно одно на обе страницы — ключа и кассы, — поэтому и мостик один.
@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('kassa', {
   saveFile: (name, base64) => ipcRenderer.sendSync('data:file', name, base64),
   autoGet: () => ipcRenderer.sendSync('auto:get'),
   autoSet: (on) => ipcRenderer.sendSync('auto:set', on),
+  recover: (code) => ipcRenderer.sendSync('pin:recover', code),
 });
 
 contextBridge.exposeInMainWorld('ключ', {

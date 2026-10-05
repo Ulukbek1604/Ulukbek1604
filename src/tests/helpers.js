@@ -47,6 +47,7 @@ async function open({ role = 'cashier', seed = null, desk = null } = {}) {
         where: () => 'C:\\Касса\\касса.json',
         reveal: () => true, backup: () => { window.__backups += 1; return 'копия.json'; }, saveFile: () => 'x',
         autoGet: () => false, autoSet: () => false,
+        recover: (code) => code === 'GOOD-CODE-0000',
       };
     }, desk.initial ?? null);
   }

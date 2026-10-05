@@ -12,7 +12,7 @@
 const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
-const { fingerprint, keyFor, keyFits } = require('./ключи.js');
+const { fingerprint, keyFor, keyFits, recoveryFits } = require('./ключи.js');
 
 /**
  * Поменьше процессов и памяти.
@@ -163,6 +163,15 @@ function savedKey() {
  */
 ipcMain.on('key:print', (event) => {
   event.returnValue = fingerprint();
+});
+
+/**
+ * Сброс PIN владельца. Код считается от секрета, которого в странице нет,
+ * поэтому проверка здесь, в главном процессе, а странице отдаётся только
+ * «подошёл или нет».
+ */
+ipcMain.on('pin:recover', (event, code) => {
+  event.returnValue = recoveryFits(code);
 });
 
 ipcMain.on('key:try', (event, key) => {

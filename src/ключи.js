@@ -85,6 +85,27 @@ function keyFor(print) {
  */
 const MASTER = '31322005';
 
+/**
+ * Код сброса PIN владельца для этого компьютера.
+ *
+ * Владелец забыл четыре цифры — в кассе он нажимает «Забыли код?», видит
+ * отпечаток компьютера и диктует его мне; я выдаю код сброса. Он считается
+ * от того же секрета, но с другой меткой, поэтому ключ программы сбросом
+ * не станет, а сброс другого компьютера этому не подойдёт.
+ */
+function recoveryFor(print) {
+  const mac = crypto.createHmac('sha256', SECRET).update('pin-reset:' + tidy(print)).digest();
+  let out = '';
+  for (let i = 0; i < 20; i += 1) out += ALPHABET[mac[i] % ALPHABET.length];
+  return out.replace(/(.{5})(.{5})(.{5})(.{5})/, '$1-$2-$3-$4');
+}
+
+/** Подходит ли код сброса этому компьютеру. */
+function recoveryFits(code, print = fingerprint()) {
+  const given = tidy(code);
+  return given !== '' && given === tidy(recoveryFor(print));
+}
+
 /** Подходит ли ключ этому компьютеру. */
 function keyFits(key, print = fingerprint()) {
   const given = tidy(key);
@@ -92,4 +113,4 @@ function keyFits(key, print = fingerprint()) {
   return given === tidy(MASTER) || given === tidy(keyFor(print));
 }
 
-module.exports = { fingerprint, keyFor, keyFits, tidy };
+module.exports = { fingerprint, keyFor, keyFits, recoveryFor, recoveryFits, tidy };

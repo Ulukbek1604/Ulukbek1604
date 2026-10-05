@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { fingerprint, keyFor, keyFits, tidy } = require('../ключи.js');
+const { fingerprint, keyFor, keyFits, recoveryFor, recoveryFits, tidy } = require('../ключи.js');
 
 const PRINT = 'A1B2-C3D4-E5F6';
 
@@ -50,4 +50,29 @@ test('keyFits: чужой, пустой и обрезанный ключ не п
 test('keyFits по умолчанию сверяет с отпечатком этой машины', () => {
   assert.ok(keyFits(keyFor(fingerprint())));
   assert.ok(!keyFits(keyFor('0000-0000-0000')));
+});
+
+test('код сброса PIN: формат, детерминирован, привязан к машине', () => {
+  const code = recoveryFor(PRINT);
+  assert.match(code, /^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/);
+  assert.equal(code, recoveryFor(PRINT));
+  assert.equal(code, recoveryFor('a1b2c3d4e5f6'));
+  assert.notEqual(code, recoveryFor('A1B2-C3D4-E5F7'));
+});
+
+test('код сброса не равен ключу программы, и они не подменяют друг друга', () => {
+  assert.notEqual(recoveryFor(PRINT), keyFor(PRINT));
+  assert.ok(!keyFits(recoveryFor(PRINT), PRINT), 'сброс не открывает программу');
+  assert.ok(!recoveryFits(keyFor(PRINT), PRINT), 'ключ программы не сбрасывает PIN');
+});
+
+test('recoveryFits: свой код подходит в любом оформлении, чужой, пустой и обрезанный — нет', () => {
+  const code = recoveryFor(PRINT);
+  assert.ok(recoveryFits(code, PRINT));
+  assert.ok(recoveryFits(code.toLowerCase().replace(/-/g, ' '), PRINT));
+  assert.ok(!recoveryFits(recoveryFor('FFFF-FFFF-FFFF'), PRINT));
+  assert.ok(!recoveryFits('', PRINT));
+  assert.ok(!recoveryFits(null, PRINT));
+  assert.ok(!recoveryFits(code.slice(0, 12), PRINT));
+  assert.ok(recoveryFits(recoveryFor(fingerprint())), 'по умолчанию — этот компьютер');
 });
