@@ -1165,8 +1165,14 @@ function buildWorkbook() {
     ]),
   ];
 
+  const intakeRows = [
+    ['Дата', 'Время', 'Принял(а)', 'Товар', 'Кол-во', 'Тип', 'Код'],
+    ...data.intakes.map((i) => [day(i.at), time(i.at), i.by, i.name, i.qty, INTAKE_KIND[i.kind] ?? i.kind, i.code ?? '']),
+  ];
+
   return makeWorkbook([
     { name: 'Сводка', rows: summary, widths: [34, 16, 52, 52] },
+    { name: 'Приёмка', rows: intakeRows, widths: [12, 9, 16, 34, 9, 16, 18] },
     { name: 'Смены', rows: shiftRows, widths: [18, 18, 16, 16, 8, 8, 12, 14, 12, 10, 10, 12] },
     { name: 'Товары', rows: goods, widths: [30, 16, 10, 10, 11, 9, 18, 9, 15, 12, 12, 15] },
     { name: 'Продажи', rows: sales, widths: [12, 9, 12, 10, 12, 10, 15, 12, 10] },
@@ -1320,6 +1326,8 @@ const SEED = {
   shiftStart: null,
   /** Кто и когда открыл текущую смену. null — смена не открыта, продавать нельзя. */
   shiftOpen: null,
+  /** Журнал приёмки: кто, когда и что принял. */
+  intakes: [],
   notes: [],
 };
 
@@ -1359,6 +1367,8 @@ let newPin = null;
 /** Владелец меняет уже заданный код. */
 let changing = false;
 
+/** Поиск в списке «Выбрать из списка» на экране продажи. */
+let plSearch = '';
 /** Отбор в списке «к какому товару отнести эту коробку». */
 let pick = '';
 
@@ -1471,6 +1481,7 @@ function fixUp(d) {
     // Телефоны и прочее с памятью — штучный товар, код на каждой коробке свой.
   }
   if (typeof d.limitOn !== 'boolean') d.limitOn = true;
+  if (!Array.isArray(d.intakes)) d.intakes = [];
   if (!Array.isArray(d.staff)) d.staff = [];
   if (!d.sold || typeof d.sold !== 'object') d.sold = {};
   if (!Array.isArray(d.shifts)) d.shifts = [];
@@ -1646,6 +1657,32 @@ const stamp = (ms) => new Date(ms).toLocaleString('ru-RU', { day: '2-digit', mon
 const isReturn = (c) => c.kind === 'return';
 const salesOnly = (list) => list.filter((c) => !isReturn(c));
 
+/**
+ * Запись в журнал приёмки. Кассир принимает под своим именем, поэтому
+ * без выбранного имени приём не идёт: иначе записать, кто принял, некому.
+ */
+function logIntake(g, qty, kind, code) {
+  data.intakes.push({
+    id: 'i' + Date.now() + Math.random().toString(36).slice(2, 5),
+    at: Date.now(), by: sellerName() ?? 'Кассир', byId: owner() ? 'owner' : me()?.id ?? null,
+    name: g.name, qty, kind, code: code ?? null,
+  });
+  if (data.intakes.length > 2000) data.intakes = data.intakes.slice(-2000);
+}
+
+const INTAKE_KIND = { box: 'коробка', qty: 'партия', new: 'новый товар', 'new-box': 'новый товар', fix: 'правка остатка' };
+
+function intakeBox() {
+  const rows = data.intakes.slice(-15).reverse();
+  return `
+    <h2>Приёмка</h2>
+    ${rows.length === 0 ? '<p class="q">Пока ничего не принимали.</p>' : `
+      <div class="rows">${rows.map((r) => `
+        <div class="row"><div class="grow"><div class="t">${esc(r.name)}</div>
+          <div class="q2">${stamp(r.at)}, ${esc(r.by)}, ${INTAKE_KIND[r.kind] ?? r.kind}${r.code ? `, ${esc(r.code)}` : ''}</div></div>
+          <div class="amt n">${r.qty > 0 ? '+' : ''}${r.qty} шт</div></div>`).join('')}</div>`}`;
+}
+
 /** Итог текущей смены: цифры, разбивка по кассирам и что именно продано. */
 function shiftSummary() {
   const list = shift();
@@ -1669,6 +1706,8 @@ function shiftSummary() {
     openedBy: data.shiftOpen?.by ?? null,
     checks: sales, units, revenue, cost, profit: revenue - cost, off,
     returns, refunds,
+    received: data.intakes.filter((i) => i.kind !== 'fix' && i.at >= (data.shiftStart ?? Date.now() - 12 * 3600e3))
+      .reduce((a, i) => a + i.qty, 0),
     avg: sales ? Math.round(salesSum / sales) : 0,
     byWho: [...byWho.values()].sort((a, b) => b.sum - a.sum),
     items: [...items].map(([name, qty]) => ({ name, qty })).filter((i) => i.qty > 0).sort((a, b) => b.qty - a.qty),
@@ -1683,6 +1722,7 @@ function shiftText(r) {
     ...(owner() ? [`Прибыль: ${som(r.profit)}`] : []),
     `Чеков: ${r.checks}, штук: ${r.units}, средний чек: ${som(r.avg)}`,
     ...(r.returns ? [`Возвраты: ${r.returns} на ${som(r.refunds)} (уже вычтены из выручки)`] : []),
+    ...(r.received ? [`Принято товара: ${r.received} шт`] : []),
     `Скинули: ${som(r.off)}`,
     ...(r.byWho.length ? ['По кассирам:', ...r.byWho.map((w) => `  ${w.name}: ${w.n} ${plural(w.n, 'чек', 'чека', 'чеков')}, ${som(w.sum)}`)] : []),
     ...(r.items.length ? ['Продано:', ...r.items.map((i) => `  ${i.name} — ${i.qty} шт`)] : []),
@@ -1690,11 +1730,20 @@ function shiftText(r) {
 }
 
 /** Блок с кнопкой закрытия — для экранов, где смену обычно и заканчивают. */
+/** Смена открыта слишком давно — скорее всего, про неё забыли. */
+const STALE_SHIFT_HOURS = 16;
+function staleNote() {
+  const o = data.shiftOpen;
+  if (!o || Date.now() - o.at < STALE_SHIFT_HOURS * 3600e3) return '';
+  return `<div class="aside" style="margin-bottom:12px">Смена открыта ${stamp(o.at)} (${esc(o.by)}) — больше ${STALE_SHIFT_HOURS} часов. Закройте её и откройте новую: так итог дня будет верным.</div>`;
+}
+
 function closeBox() {
   const list = shift();
   const from = data.shiftOpen?.at ?? data.shiftStart ?? list[0]?.at;
   return `
     <h2>Закрытие смены</h2>
+    ${staleNote()}
     <p class="q">${data.shiftOpen ? `Смена открыта ${stamp(data.shiftOpen.at)} (${esc(data.shiftOpen.by)}).` : from ? `Смена идёт с ${stamp(from)}.` : 'Смена не открыта.'} Продаж: ${list.length}.
       Закройте её, когда закончили: получится итог, а счёт новой смены пойдёт с нуля.</p>
     <button class="btn" id="shift-close" type="button">Закрыть смену</button>`;
@@ -1756,6 +1805,7 @@ function onScan(code) {
   const soldDay = (x) => new Date(x.at).toLocaleDateString('ru-RU');
 
   if (tab === 'intake') {
+    if (needName()) return;
     if (data.sold[code]) { flash(`Коробка ${code} уже продана ${soldDay(data.sold[code])}`); return; }
     // Штучный товар: знакомый код значит, что эту коробку уже принимали.
     if (g && isSerial(g)) { flash(`Коробка ${code} уже принята: ${g.name}`); return; }
@@ -1830,6 +1880,24 @@ function scanBox() {
     </div>`;
 }
 
+/**
+ * Ходовое: то, что брали чаще всего за три недели. Нет в наличии — в конец,
+ * а пока продаж нет, наверху последнее принятое.
+ */
+function popular(n = 6) {
+  const since = Date.now() - 21 * 86400e3;
+  const sold = new Map();
+  for (const c of data.checks) {
+    if (c.at < since) continue;
+    for (const l of c.lines) sold.set(l.name, (sold.get(l.name) ?? 0) + l.qty);
+  }
+  return data.goods
+    .map((g, i) => ({ g, i, q: sold.get(g.name) ?? 0 }))
+    .sort((a, b) => (b.g.stock > 0) - (a.g.stock > 0) || b.q - a.q || (b.g.at ?? 0) - (a.g.at ?? 0) || a.i - b.i)
+    .slice(0, n)
+    .map((x) => x.g);
+}
+
 function viewWho() {
   if (data.staff.length === 0) {
     return `
@@ -1860,6 +1928,7 @@ function viewSale() {
   return `
     <div class="two-pane">
       <div>
+        ${staleNote()}
         ${owner() ? '' : `<p class="q2" style="margin:0 0 10px">Продаёт: <b>${esc(me().name)}</b>
           <button class="plain q2" id="who-change" type="button" style="color:var(--red);font-weight:600;width:auto">сменить</button></p>`}
         ${scanBox()}
@@ -1867,7 +1936,7 @@ function viewSale() {
 
         <h2>Ходовое</h2>
         <div class="goods">
-          ${data.goods.slice(0, 6).map((g) => `
+          ${popular().map((g) => `
             <button class="good" data-add="${g.id}" type="button" ${g.stock <= 0 ? 'disabled' : ''}>
               <span class="t">${esc(g.name)}</span>
               <span class="p n">${som(g.price)}</span>
@@ -2035,6 +2104,8 @@ function viewReport() {
             <div class="q2 n" style="text-align:right;color:var(--money)">${som(r.profit)}</div>
           </div>`).join('')}
       </div>`}
+
+    ${intakeBox()}
 
     <h2>Выгрузка</h2>
     <p class="q">Книга Excel со всем: сводка и советы, товары с наценкой и запасом, все чеки и позиции, разбивка по дням и часам. Числа — числами, можно считать прямо в Excel.</p>
@@ -2226,6 +2297,7 @@ function viewMore() {
 
     <h2>Программа на компьютере</h2>
     <div class="rows" style="padding:13px">
+      ${DESK ? '' : `
       <div class="row" style="padding-top:0">
         <div class="grow"><div class="q2">Связь</div>
           <div class="t">${online ? 'Интернет есть' : 'Интернета нет — касса работает дальше'}</div></div>
@@ -2234,7 +2306,7 @@ function viewMore() {
       <div class="row">
         <div class="grow"><div class="q2">Офлайн</div>
           <div class="t" id="sw-state">проверяю…</div></div>
-      </div>
+      </div>`}
       <p class="q" style="margin:10px 0 0">
         ${DESK
           ? 'Это программа на компьютере. Интернет ей не нужен вовсе, всё лежит вот в этом файле.'
@@ -2604,10 +2676,18 @@ function sheetCode() {
 }
 
 function sheetPick() {
+  const q = plSearch.trim().toLowerCase();
+  const list = data.goods.filter((g) => !q || g.name.toLowerCase().includes(q)
+    || g.codes.some((c) => c.toLowerCase().includes(q)));
   return `
     <h3>Выбрать из списка</h3>
+    <div class="search">
+      ${svg('scan', 18)}
+      <input id="pl-q" value="${esc(plSearch)}" placeholder="Название или код" autocomplete="off" autofocus>
+      ${plSearch ? `<button class="plain" id="pl-clear" type="button" aria-label="Очистить">${svg('cross', 16)}</button>` : ''}
+    </div>
     <div class="rows">
-      ${data.goods.map((g) => `
+      ${list.length === 0 ? '<p class="q" style="padding:12px 0">Ничего не нашлось.</p>' : list.map((g) => `
         <div class="row">
           <button class="plain grow" type="button" data-add="${g.id}" ${g.stock <= 0 ? 'disabled' : ''}>
             <div class="t" style="${g.stock <= 0 ? 'color:var(--ink-3)' : ''}">${esc(g.name)}</div>
@@ -2639,6 +2719,7 @@ function sheetShift(r, mode) {
       <div class="figure"><b style="color:var(--cut)">${som(r.off)}</b><span>скинули</span></div>
     </div>
     ${r.returns ? `<p class="q2" style="margin-top:10px">Возвраты: ${r.returns} на ${som(r.refunds)} — уже вычтены из выручки.</p>` : ''}
+    ${r.received ? `<p class="q2" style="margin-top:6px">Принято товара за смену: ${r.received} шт.</p>` : ''}
 
     ${r.byWho.length ? `
       <h2>По кассирам</h2>
@@ -2873,6 +2954,8 @@ function render() {
   // Не data-off: так зовётся кнопка скидки, и нажатие по указателю
   // сети уводило бы в лист скидки несуществующей строки.
   link.dataset.down = online ? '' : '1';
+  // Программа на компьютере с интернетом не связана — индикатор только путает.
+  link.style.display = DESK ? 'none' : '';
 
   const main = document.getElementById('screen');
   const keep = main.scrollTop;
@@ -3014,18 +3097,17 @@ document.addEventListener('click', (event) => {
   /* вход и выход владельца */
   if (el.id === 'owner-in') { pin = ''; newPin = null; changing = false; sheet = { k: 'ownerpin' }; return render(); }
   if (el.id === 'pin-change') { pin = ''; newPin = null; changing = true; sheet = { k: 'ownerpin' }; return render(); }
-  if (el.id === 'owner-out') {
-    signed = 'cashier'; data.role = 'cashier'; tab = 'sale'; sellerId = null;
-    save(); render();
-    return flash('Вы снова за кассой');
-  }
+  if (el.id === 'owner-out') return ownerOut('Вы снова за кассой');
 
   if (d.veil && el.classList.contains('veil')) { camStop(); sheet = null; return render(); }
   if (d.shut) {
     camStop();
+    // Владелец закрыл смену и прочитал итог — дальше за кассой уже не он.
+    const leave = sheet?.k === 'shiftview' && sheet.fresh && owner() && !pinned;
     // Передумали вводить код — черновик ввода не должен пережить закрытие.
     pin = ''; newPin = null; changing = false;
     sheet = null;
+    if (leave) return ownerOut('Смена закрыта. Вы снова за кассой');
     return render();
   }
   if (el.id === 'cam-open') { sheet = { k: 'cam' }; return render(); }
@@ -3151,6 +3233,8 @@ document.addEventListener('click', (event) => {
     data.shiftOpen = null;
     // +1: чек, оформленный в ту же миллисекунду, не должен попасть в обе смены.
     data.shiftStart = to + 1;
+    // Конец смены — самое подходящее время для копии: итог дня уже записан.
+    try { DESK?.backup(); } catch (error) { /* копия не повод не закрывать смену */ }
     // Следующий кассир выберет себя сам: смена закончилась вместе с прежним.
     if (!owner()) sellerId = null;
     sheet = { k: 'shiftview', id: rec.id, fresh: true };
@@ -3241,7 +3325,8 @@ document.addEventListener('click', (event) => {
 
   /* сканер вручную и список */
   if (el.id === 'code-manual') { sheet = { k: 'code' }; return render(); }
-  if (el.id === 'pick-list') { sheet = { k: 'pick' }; return render(); }
+  if (el.id === 'pick-list') { plSearch = ''; sheet = { k: 'pick' }; return render(); }
+  if (el.id === 'pl-clear') { plSearch = ''; return render(); }
   if (el.id === 'code-go') {
     const code = document.getElementById('code-field').value.trim();
     if (!code) return flash('Введите код');
@@ -3259,6 +3344,7 @@ document.addEventListener('click', (event) => {
 
   // Коробка той же модели: код прибавляется к товару, остаток растёт.
   if (d.attach) {
+    if (needName()) return;
     const g = good(d.attach);
     const code = sheet?.code;
     if (code && !g.codes.includes(code)) g.codes.push(code);
@@ -3266,6 +3352,7 @@ document.addEventListener('click', (event) => {
     if (g.codes.length > 300) g.codes = g.codes.slice(-300);
     g.stock += 1;
     g.at = Date.now();
+    logIntake(g, 1, 'box', code);
     sheet = null; save(); render();
     return flash(`${g.name}: стало ${g.stock} шт`);
   }
@@ -3277,6 +3364,7 @@ document.addEventListener('click', (event) => {
     return render();
   }
   if (el.id === 'ng-save') {
+    if (needName()) return;
     ngRead();
     const name = ngName();
     const cost = Number(ng.cost);
@@ -3298,7 +3386,7 @@ document.addEventListener('click', (event) => {
       return flash(`«${same.name}» уже заведён — выберите его в списке`);
     }
 
-    data.goods.push({
+    const made = {
       id: 'g' + Date.now(),
       codes: ng.code ? [ng.code] : [],
       name,
@@ -3309,15 +3397,19 @@ document.addEventListener('click', (event) => {
       cost, price,
       stock: qty,
       at: Date.now(),
-    });
+    };
+    data.goods.push(made);
+    logIntake(made, qty, ng.code ? 'new-box' : 'new', ng.code);
     ng = null;
     sheet = null; save(); render();
     return flash(`${name}: принято ${qty} шт, наценка ${Math.round(((price - cost) / cost) * 100)}%`);
   }
   if (d.tksave) {
+    if (needName()) return;
     const g = good(d.tksave);
-    const qty = Number(document.getElementById('tk-qty').value) || 1;
-    g.stock += Math.max(1, qty);
+    const qty = Math.max(1, Number(document.getElementById('tk-qty').value) || 1);
+    g.stock += qty;
+    logIntake(g, qty, 'qty');
     // Закупку и цену меняет только владелец: у кассира этих полей нет.
     const costField = document.getElementById('tk-cost');
     const priceField = document.getElementById('tk-price');
@@ -3341,9 +3433,11 @@ document.addEventListener('click', (event) => {
     g.name = name;
     // Цены и остаток правит только владелец: у кассира этих полей нет.
     if (owner()) {
+      const was = g.stock;
       g.cost = Number(document.getElementById('ed-cost').value) || g.cost;
       g.price = Number(document.getElementById('ed-price').value) || g.price;
       g.stock = Math.max(0, Number(document.getElementById('ed-stock').value) || 0);
+      if (g.stock !== was) logIntake(g, g.stock - was, 'fix');
     }
     sheet = null; save(); render();
     return flash('Сохранено');
@@ -3432,7 +3526,7 @@ document.addEventListener('input', (event) => {
 
   // Отбор перерисовывает список под полем, поэтому возвращаем в поле
   // и место ввода: иначе с третьей буквы курсор прыгает в начало.
-  for (const [поле, запись] of [['q', (v) => { search = v; }], ['pick-q', (v) => { pick = v; }], ['chk-q', (v) => { chkSearch = v; }]]) {
+  for (const [поле, запись] of [['q', (v) => { search = v; }], ['pick-q', (v) => { pick = v; }], ['chk-q', (v) => { chkSearch = v; }], ['pl-q', (v) => { plSearch = v; }]]) {
     if (id !== поле) continue;
     запись(event.target.value);
     const pos = event.target.selectionStart;
@@ -3460,10 +3554,39 @@ document.addEventListener('input', (event) => {
   }
 });
 
+/* --------------------------------------------------- автовыход владельца */
+
+/**
+ * Владелец не должен оставаться «внутри», когда отошёл от кассы: за его
+ * записью закупка и прибыль. Пока он что-то нажимает, касса не мешает;
+ * замолчал на пять минут — возвращаемся к кассиру. Ссылка «?role=owner»
+ * (демонстрация) не выходит: там владелец задан адресом, а не кодом.
+ */
+let OWNER_IDLE_MS = 5 * 60e3;
+let lastTouch = Date.now();
+for (const type of ['pointerdown', 'keydown']) {
+  document.addEventListener(type, () => { lastTouch = Date.now(); }, true);
+}
+
+function ownerOut(text) {
+  signed = 'cashier'; data.role = 'cashier'; tab = 'sale'; sellerId = null;
+  sheet = null; pin = ''; newPin = null; changing = false;
+  save(); render();
+  return flash(text);
+}
+
+function idleCheck() {
+  if (!owner() || pinned) return;
+  if (Date.now() - lastTouch < OWNER_IDLE_MS) return;
+  ownerOut('Владелец вышел: долго не было действий');
+}
+setInterval(idleCheck, 10000);
+
 /* ---------------------------------------------------- работа без сети */
 
 function linkChanged() {
   online = navigator.onLine;
+  if (DESK) return;
   render();
   flash(online ? 'Интернет вернулся' : 'Интернета нет. Касса работает, данные останутся здесь');
 }

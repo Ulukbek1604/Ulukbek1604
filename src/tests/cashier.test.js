@@ -28,6 +28,7 @@ kassa('у кассира есть вкладка «Приём»', async (k) => {
 });
 
 kassa('кассир принимает коробку: код прибавляется, остаток растёт', async (k) => {
+  await k.pickName();
   await k.page.click('[data-tab="intake"]');
   await k.scan('CASHIER-BOX-1');
   assert.equal(await k.state(() => sheet.k), 'newcode');
@@ -39,6 +40,7 @@ kassa('кассир принимает коробку: код прибавляе
 });
 
 kassa('кассир видит список остатка без закупки и наценки', async (k) => {
+  await k.pickName();
   await k.page.click('[data-tab="intake"]');
   const t = await k.text();
   assert.match(t, /Что на остатке/);
@@ -47,6 +49,7 @@ kassa('кассир видит список остатка без закупки
 });
 
 kassa('кассир принимает штуки известного товара: только количество, цены не трогаются', async (k) => {
+  await k.pickName();
   await k.page.click('[data-tab="intake"]');
   await k.scan(GLASS);
   assert.equal(await k.state(() => sheet.k), 'take');
@@ -60,6 +63,7 @@ kassa('кассир принимает штуки известного това�
 });
 
 kassa('кассир не может править цены, остаток и убирать товар', async (k) => {
+  await k.pickName();
   await k.page.click('[data-tab="intake"]');
   await k.page.click('[data-edit="g6"]');
   assert.equal(await k.page.locator('#ed-cost, #ed-price, #ed-stock').count(), 0);
@@ -76,6 +80,7 @@ kassa('кассир не может править цены, остаток и �
 });
 
 kassa('кассир заводит новую модель: цена закупа нужна, штука одна', async (k) => {
+  await k.pickName();
   await k.page.click('[data-tab="intake"]');
   await k.scan('CASHIER-NEW-1');
   await k.page.click('#ng-open');
@@ -90,6 +95,7 @@ kassa('кассир заводит новую модель: цена закуп�
 });
 
 kassa('принятую кассиром коробку можно продать, повторно принять нельзя', async (k) => {
+  await k.pickName();
   await k.page.click('[data-tab="intake"]');
   await k.scan('CASHIER-BOX-2');
   await k.page.click('[data-attach="g1"]');
@@ -97,7 +103,6 @@ kassa('принятую кассиром коробку можно продат�
   assert.match(await k.flash(), /уже принята/);
   assert.equal(await k.state(() => good('g1').stock), 4);
   await k.page.click('[data-tab="sale"]');
-  await k.pickName();
   await k.scan('CASHIER-BOX-2');
   assert.equal(await k.state(() => check[0].codes[0]), 'CASHIER-BOX-2');
 });

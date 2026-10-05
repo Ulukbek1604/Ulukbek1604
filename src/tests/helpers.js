@@ -40,12 +40,12 @@ async function open({ role = 'cashier', seed = null, desk = null } = {}) {
   }
   if (desk) {
     await page.addInitScript((initial) => {
-      window.__saved = [];
+      window.__saved = []; window.__backups = 0;
       window.kassa = {
         load: () => initial,
         save: (d) => { window.__saved.push(JSON.parse(JSON.stringify(d))); return true; },
         where: () => 'C:\\Касса\\касса.json',
-        reveal: () => true, backup: () => 'копия.json', saveFile: () => 'x',
+        reveal: () => true, backup: () => { window.__backups += 1; return 'копия.json'; }, saveFile: () => 'x',
         autoGet: () => false, autoSet: () => false,
       };
     }, desk.initial ?? null);

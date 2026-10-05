@@ -131,6 +131,7 @@ kassa('штучный товар: нельзя добавить больше о�
 
 kassa('штучный товар: набор из списка упирается в остаток (3)', async (k) => {
   await k.pickName();
+  await k.state(() => { data.checks = []; render(); });
   for (let i = 0; i < 6; i += 1) await k.state(() => document.querySelector('[data-add="g1"]').click());
   assert.equal(await k.state(() => check[0].qty), 3);
   assert.match(await k.flash(), /на остатке 3 шт/);
@@ -148,6 +149,7 @@ kassa('товар с одним кодом на все штуки пикаетс
 
 kassa('убрали одну штуку — снова можно добавить, но не выше остатка', async (k) => {
   await k.pickName();
+  await k.state(() => { data.checks = []; render(); });
   for (let i = 0; i < 3; i += 1) await k.state(() => document.querySelector('[data-add="g1"]').click());
   await k.page.click('[data-less="g1"]');
   assert.equal(await k.state(() => check[0].qty), 2);
@@ -163,7 +165,9 @@ kassa('нулевой остаток: не добавить ни пиком, н�
   await k.scan(IPHONE);
   assert.match(await k.flash(), /остатке ноль/);
   assert.equal(await k.state(() => check.length), 0);
-  assert.equal(await k.page.locator('[data-add="g1"][disabled]').count(), 1);
+  assert.equal(await k.page.locator('.goods [data-add="g1"]').count(), 0, 'в «Ходовом» закончившегося нет');
+  await k.page.click('#pick-list');
+  assert.equal(await k.page.locator('.sheet [data-add="g1"][disabled]').count(), 1, 'в общем списке он есть, но недоступен');
 });
 
 kassa('остаток упал, пока чек лежал: продажа отклоняется и ничего не списывает', async (k) => {
