@@ -1118,9 +1118,10 @@ function buildWorkbook() {
   ];
 
   const sales = [
-    ['Дата', 'Время', 'Продал', 'Позиций', 'Сумма', 'Скидка', 'Себестоимость', 'Прибыль'],
+    ['Дата', 'Время', 'Продал', 'Позиций', 'Сумма', 'Скидка', 'Себестоимость', 'Прибыль', 'Тип'],
     ...checks.map((c) => [
       day(c.at), time(c.at), c.by, c.lines.length, c.total, c.off, c.cost, c.total - c.cost,
+      isReturn(c) ? 'возврат' : 'продажа',
     ]),
   ];
 
@@ -1157,18 +1158,18 @@ function buildWorkbook() {
   ];
 
   const shiftRows = [
-    ['Открыта', 'Закрыта', 'Открыл(а)', 'Закрыл(а)', 'Чеков', 'Штук', 'Выручка', 'Себестоимость', 'Прибыль', 'Скидок', 'Средний чек'],
+    ['Открыта', 'Закрыта', 'Открыл(а)', 'Закрыл(а)', 'Чеков', 'Штук', 'Выручка', 'Себестоимость', 'Прибыль', 'Скидок', 'Возвраты', 'Средний чек'],
     ...data.shifts.map((r) => [
       new Date(r.from).toLocaleString('ru-RU'), new Date(r.to).toLocaleString('ru-RU'), r.openedBy ?? '', r.by,
-      r.checks, r.units, r.revenue, r.cost, r.profit, r.off, r.avg,
+      r.checks, r.units, r.revenue, r.cost, r.profit, r.off, r.refunds ?? 0, r.avg,
     ]),
   ];
 
   return makeWorkbook([
     { name: 'Сводка', rows: summary, widths: [34, 16, 52, 52] },
-    { name: 'Смены', rows: shiftRows, widths: [18, 18, 16, 16, 8, 8, 12, 14, 12, 10, 12] },
+    { name: 'Смены', rows: shiftRows, widths: [18, 18, 16, 16, 8, 8, 12, 14, 12, 10, 10, 12] },
     { name: 'Товары', rows: goods, widths: [30, 16, 10, 10, 11, 9, 18, 9, 15, 12, 12, 15] },
-    { name: 'Продажи', rows: sales, widths: [12, 9, 12, 10, 12, 10, 15, 12] },
+    { name: 'Продажи', rows: sales, widths: [12, 9, 12, 10, 12, 10, 15, 12, 10] },
     { name: 'Позиции чеков', rows: lines, widths: [12, 9, 30, 9, 11, 10, 12] },
     { name: 'По дням', rows: days, widths: [12, 9, 12, 15, 12, 10] },
     { name: 'По часам', rows: hours, widths: [9, 9, 12] },
@@ -1478,9 +1479,14 @@ function fixUp(d) {
   // Что продано до этой перемены, тоже считается проданным.
   const штучные = new Set((d.goods ?? []).filter(isSerial).map((g) => g.name));
   for (const c of d.checks ?? []) {
+    // Чек возврата ничего не продаёт: его строки не делают коробку проданной.
+    if (c.kind === 'return') continue;
     for (const l of c.lines ?? []) {
       if (!штучные.has(l.name)) continue;
-      for (const code of l.codes ?? []) d.sold[code] ??= { at: c.at, id: c.id };
+      // Возвращённая коробка снова в продаже, её проданной считать нельзя.
+      for (const code of l.codes ?? []) {
+        if (!(l.retCodes ?? []).includes(code)) d.sold[code] ??= { at: c.at, id: c.id };
+      }
     }
   }
   return d;
@@ -1636,16 +1642,23 @@ const shift = () => data.checks.filter((c) => c.at >= (data.shiftStart ?? Date.n
 
 const stamp = (ms) => new Date(ms).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
+/** Возврат — тот же чек, но с минусом: тогда выручка, прибыль и остатки сходятся сами. */
+const isReturn = (c) => c.kind === 'return';
+const salesOnly = (list) => list.filter((c) => !isReturn(c));
+
 /** Итог текущей смены: цифры, разбивка по кассирам и что именно продано. */
 function shiftSummary() {
   const list = shift();
   const byWho = new Map();
   const items = new Map();
-  let revenue = 0, cost = 0, off = 0, units = 0;
+  let revenue = 0, cost = 0, off = 0, units = 0, sales = 0, salesSum = 0, returns = 0, refunds = 0;
   for (const c of list) {
     revenue += c.total; cost += c.cost; off += c.off;
-    const r = byWho.get(c.by) ?? { name: c.by, n: 0, sum: 0 };
-    r.n += 1; r.sum += c.total; byWho.set(c.by, r);
+    const r = byWho.get(c.by) ?? { name: c.by, n: 0, sum: 0, ret: 0 };
+    r.sum += c.total;
+    if (isReturn(c)) { r.ret += 1; returns += 1; refunds -= c.total; }
+    else { r.n += 1; sales += 1; salesSum += c.total; }
+    byWho.set(c.by, r);
     for (const l of c.lines) {
       units += l.qty;
       items.set(l.name, (items.get(l.name) ?? 0) + l.qty);
@@ -1654,10 +1667,11 @@ function shiftSummary() {
   return {
     from: data.shiftOpen?.at ?? data.shiftStart ?? list[0]?.at ?? Date.now(),
     openedBy: data.shiftOpen?.by ?? null,
-    checks: list.length, units, revenue, cost, profit: revenue - cost, off,
-    avg: list.length ? Math.round(revenue / list.length) : 0,
+    checks: sales, units, revenue, cost, profit: revenue - cost, off,
+    returns, refunds,
+    avg: sales ? Math.round(salesSum / sales) : 0,
     byWho: [...byWho.values()].sort((a, b) => b.sum - a.sum),
-    items: [...items].map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty),
+    items: [...items].map(([name, qty]) => ({ name, qty })).filter((i) => i.qty > 0).sort((a, b) => b.qty - a.qty),
   };
 }
 
@@ -1668,6 +1682,7 @@ function shiftText(r) {
     `Выручка: ${som(r.revenue)}`,
     ...(owner() ? [`Прибыль: ${som(r.profit)}`] : []),
     `Чеков: ${r.checks}, штук: ${r.units}, средний чек: ${som(r.avg)}`,
+    ...(r.returns ? [`Возвраты: ${r.returns} на ${som(r.refunds)} (уже вычтены из выручки)`] : []),
     `Скинули: ${som(r.off)}`,
     ...(r.byWho.length ? ['По кассирам:', ...r.byWho.map((w) => `  ${w.name}: ${w.n} ${plural(w.n, 'чек', 'чека', 'чеков')}, ${som(w.sum)}`)] : []),
     ...(r.items.length ? ['Продано:', ...r.items.map((i) => `  ${i.name} — ${i.qty} шт`)] : []),
@@ -1947,8 +1962,8 @@ function periodChecks(p) {
 function whoSold() {
   const people = new Map();
   for (const c of periodChecks(repPeriod)) {
-    const r = people.get(c.by) ?? { name: c.by, n: 0, units: 0, sum: 0, profit: 0 };
-    r.n += 1;
+    const r = people.get(c.by) ?? { name: c.by, n: 0, ret: 0, units: 0, sum: 0, profit: 0 };
+    if (isReturn(c)) r.ret += 1; else r.n += 1;
     r.units += c.lines.reduce((a, l) => a + l.qty, 0);
     r.sum += c.total;
     r.profit += c.total - c.cost;
@@ -1963,7 +1978,7 @@ function whoSold() {
     ${rows.length === 0 ? '<p class="q">За этот срок продаж не было.</p>' : `
       <div class="rows">${rows.map((r) => `
         <div class="row"><div class="grow"><div class="t">${esc(r.name)}</div>
-          <div class="q2">${r.n} ${plural(r.n, 'чек', 'чека', 'чеков')}, ${r.units} шт</div></div>
+          <div class="q2">${r.n} ${plural(r.n, 'чек', 'чека', 'чеков')}, ${r.units} шт${r.ret ? `, возвратов: ${r.ret}` : ''}</div></div>
           <div style="text-align:right"><div class="amt n">${som(r.sum)}</div>
             ${owner() ? `<div class="q2 n" style="color:var(--money)">${som(r.profit)}</div>` : ''}</div></div>`).join('')}</div>`}`;
 }
@@ -1974,7 +1989,8 @@ function viewReport() {
   const revenue = shiftList.reduce((s, c) => s + c.total, 0);
   const cost = shiftList.reduce((s, c) => s + c.cost, 0);
   const offs = shiftList.reduce((s, c) => s + c.off, 0);
-  const avg = shiftList.length ? Math.round(revenue / shiftList.length) : 0;
+  const soldList = salesOnly(shiftList);
+  const avg = soldList.length ? Math.round(soldList.reduce((a, c) => a + c.total, 0) / soldList.length) : 0;
   const stockCost = data.goods.reduce((s, g) => s + g.cost * g.stock, 0);
 
   return `
@@ -1982,7 +1998,7 @@ function viewReport() {
     <div class="figures">
       <div class="figure"><b>${som(revenue)}</b><span>выручка</span></div>
       <div class="figure"><b style="color:var(--money)">${som(revenue - cost)}</b><span>прибыль</span></div>
-      <div class="figure"><b>${shiftList.length}</b><span>чеков</span></div>
+      <div class="figure"><b>${soldList.length}</b><span>чеков</span></div>
     </div>
     <div class="figures" style="margin-top:9px">
       <div class="figure"><b>${som(avg)}</b><span>средний чек</span></div>
@@ -1995,13 +2011,15 @@ function viewReport() {
     <h2>Как идёт торговля</h2>
     <div id="charts" style="display:grid;gap:12px;position:relative">
       ${chartDays(all, 14)}
-      ${chartHours(all)}
+      ${chartHours(salesOnly(all))}
       ${chartTop(all)}
     </div>
 
     ${viewAdvice()}
 
     ${runningOut()}
+
+    ${findBox()}
 
     ${closeBox()}
 
@@ -2028,7 +2046,7 @@ function viewReport() {
         ${shiftList.slice().reverse().map((c) => `
           <div class="row">
             <button class="plain grow" type="button" data-receipt="${c.id}">
-              <div class="t n">${som(c.total)}</div>
+              <div class="t n">${som(c.total)}${isReturn(c) ? ' <span class="tag nt">возврат</span>' : ''}</div>
               <div class="q2">${c.lines.length} ${plural(c.lines.length, 'позиция', 'позиции', 'позиций')}, ${esc(c.by)}, ${new Date(c.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div>
             </button>
             <div style="text-align:right">
@@ -2117,17 +2135,18 @@ function viewChecks() {
         ${list.slice().reverse().map((c) => `
           <div class="row">
             <button class="plain grow" type="button" data-receipt="${c.id}">
-              <div class="t n">${som(c.total)}</div>
+              <div class="t n">${som(c.total)}${isReturn(c) ? ' <span class="tag nt">возврат</span>' : ''}</div>
               <div class="q2">${c.lines.length} ${plural(c.lines.length, 'позиция', 'позиции', 'позиций')}, ${new Date(c.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div>
             </button>
-            ${c.off ? `<span class="tag nt n">−${som(c.off)}</span>` : ''}
+            ${c.off ? `<span class="tag nt n">−${som(Math.abs(c.off))}</span>` : ''}
           </div>`).join('')}
       </div>
       <div class="figures" style="margin-top:14px">
         <div class="figure"><b>${som(list.reduce((s, c) => s + c.total, 0))}</b><span>на руках</span></div>
-        <div class="figure"><b>${list.length}</b><span>чеков</span></div>
+        <div class="figure"><b>${salesOnly(list).length}</b><span>чеков</span></div>
         <div class="figure"><b>${som(list.reduce((s, c) => s + c.off, 0))}</b><span>скинули</span></div>
       </div>`}
+    ${findBox()}
     ${closeBox()}`;
 }
 
@@ -2619,12 +2638,13 @@ function sheetShift(r, mode) {
       <div class="figure"><b>${som(r.avg)}</b><span>средний чек</span></div>
       <div class="figure"><b style="color:var(--cut)">${som(r.off)}</b><span>скинули</span></div>
     </div>
+    ${r.returns ? `<p class="q2" style="margin-top:10px">Возвраты: ${r.returns} на ${som(r.refunds)} — уже вычтены из выручки.</p>` : ''}
 
     ${r.byWho.length ? `
       <h2>По кассирам</h2>
       <div class="rows">${r.byWho.map((w) => `
         <div class="row"><div class="grow"><div class="t">${esc(w.name)}</div>
-          <div class="q2">${w.n} ${plural(w.n, 'чек', 'чека', 'чеков')}</div></div>
+          <div class="q2">${w.n} ${plural(w.n, 'чек', 'чека', 'чеков')}${w.ret ? `, возвратов: ${w.ret}` : ''}</div></div>
           <div class="amt n">${som(w.sum)}</div></div>`).join('')}</div>` : ''}
 
     ${r.items.length ? `
@@ -2642,13 +2662,133 @@ function sheetShift(r, mode) {
       <button class="btn line" data-shut="1" type="button">Закрыть</button>`}`;
 }
 
+/* ----------------------------------------------------------------- возврат */
+
+/** Сколько дней после покупки возврат оформляет кассир; позже — только владелец. */
+const RETURN_DAYS = 14;
+/** Что отмечено к возврату: номер строки -> { codes: коробки, n: штуки без кода }. */
+let retPick = {};
+/** Строка поиска чека. */
+let chkSearch = '';
+
+const checkNo = (c) => c.id.replace(/\D/g, '') || '1';
+const lineLeft = (l) => l.qty - (l.ret ?? 0);
+const checkLeft = (c) => c.lines.reduce((s, l) => s + lineLeft(l), 0);
+/** Товар строки: по id, а у старых чеков, где его нет, — по названию. */
+const lineGood = (l) => (l.id && good(l.id)) || data.goods.find((g) => g.name === l.name) || null;
+/**
+ * Коробки, которые можно отметить поштучно, — только у штучного товара.
+ * У чехла код один на все штуки, и «коробкой» он не считается: такие
+ * штуки возвращают счётчиком.
+ */
+const codesLeft = (l) => {
+  const g = lineGood(l);
+  const serial = g ? isSerial(g) : (l.codes ?? []).length > 1;
+  return serial ? (l.codes ?? []).filter((c) => !(l.retCodes ?? []).includes(c)) : [];
+};
+const plainLeft = (l) => Math.max(0, lineLeft(l) - codesLeft(l).length);
+const unitCost = (l) => l.cost ?? lineGood(l)?.cost ?? 0;
+const picked = (i) => (retPick[i] ? retPick[i].codes.length + retPick[i].n : 0);
+
+/**
+ * Сколько вернуть покупателю.
+ *
+ * Скидка на всю покупку делится между строками пропорционально их цене,
+ * а последняя штука чека забирает остаток до копейки: сколько заплатили,
+ * столько и вернули, без накопившейся округлением разницы.
+ */
+function returnQuote(c) {
+  const sumNet = c.lines.reduce((s, l) => s + l.price * l.qty - l.off, 0);
+  const lineOff = c.lines.reduce((s, l) => s + l.off, 0);
+  const wholeDisc = Math.max(0, c.off - lineOff);
+  let gross = 0, part = 0, cost = 0, units = 0;
+  const lines = [];
+  c.lines.forEach((l, i) => {
+    const n = picked(i);
+    if (!n) return;
+    const unitOff = l.off / l.qty;
+    gross += l.price * n;
+    part += (l.price - unitOff) * n;
+    cost += unitCost(l) * n;
+    units += n;
+    lines.push({ i, n, off: Math.round(unitOff * n) });
+  });
+  const last = units > 0 && checkLeft(c) - units === 0;
+  const refund = last
+    ? c.total - (c.refunded ?? 0)
+    : Math.round(part - (sumNet > 0 ? (wholeDisc * part) / sumNet : 0));
+  return { refund, gross, cost, units, lines };
+}
+
+/** Поиск чека для возврата: по коробке (IMEI), названию или номеру. */
+function findBox() {
+  const q = chkSearch.trim().toLowerCase();
+  const sales = salesOnly(data.checks).slice().reverse();
+  const list = (q
+    ? sales.filter((c) => checkNo(c).includes(q)
+      || c.lines.some((l) => l.name.toLowerCase().includes(q) || (l.codes ?? []).some((x) => x.toLowerCase().includes(q))))
+    : sales).slice(0, 8);
+
+  return `
+    <h2>Найти чек для возврата</h2>
+    <div class="search">
+      ${svg('scan', 18)}
+      <input id="chk-q" value="${esc(chkSearch)}" placeholder="IMEI, товар или номер чека" autocomplete="off">
+    </div>
+    ${list.length === 0 ? '<p class="q">Ничего не нашлось.</p>' : `
+      <div class="rows">
+        ${list.map((c) => `
+          <div class="row">
+            <button class="plain grow" type="button" data-receipt="${c.id}">
+              <div class="t n">${som(c.total)}${checkLeft(c) === 0 ? ' <span class="tag nt">всё возвращено</span>' : ''}</div>
+              <div class="q2">${esc(c.lines.map((l) => l.name).join(', '))}</div>
+              <div class="q2">${new Date(c.at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}, ${esc(c.by)}</div>
+            </button>
+          </div>`).join('')}
+      </div>`}`;
+}
+
+function sheetReturn(id) {
+  const c = data.checks.find((x) => x.id === id);
+  const q = returnQuote(c);
+  return `
+    <h3>Возврат по чеку № ${checkNo(c)}</h3>
+    <p class="q">${new Date(c.at).toLocaleDateString('ru-RU')}, продал ${esc(c.by)}. Отметьте, что возвращает покупатель.</p>
+    <div class="rows">
+      ${c.lines.map((l, i) => {
+        const left = lineLeft(l);
+        if (left <= 0) return '';
+        const codes = codesLeft(l);
+        const plain = plainLeft(l);
+        const pick = retPick[i] ?? { codes: [], n: 0 };
+        return `<div class="row"><div class="grow">
+          <div class="t">${esc(l.name)}</div>
+          <div class="q2 n">${som(l.price)} — можно вернуть ${left} шт</div>
+          ${codes.length ? `<div class="cuts" style="flex-wrap:wrap;gap:6px;margin-top:8px">${codes.map((code) => `
+            <button class="cut n" type="button" data-retcode="${i}" data-code="${esc(code)}" aria-pressed="${pick.codes.includes(code)}">${esc(code)}</button>`).join('')}</div>` : ''}
+          ${plain ? `<div class="stepper" style="margin-top:8px">
+            <button type="button" data-retless="${i}" aria-label="Меньше">${svg('minus')}</button>
+            <span class="v">${pick.n}</span>
+            <button type="button" data-retmore="${i}" aria-label="Больше">${svg('plus')}</button></div>` : ''}
+        </div></div>`;
+      }).join('')}
+    </div>
+    <div class="ledger">
+      <div style="align-items:flex-end"><span style="font-weight:700">Вернуть покупателю</span><span class="big">${som(q.units ? q.refund : 0)}</span></div>
+    </div>
+    <button class="btn" id="ret-confirm" type="button">Оформить возврат</button>
+    <button class="btn line" data-shut="1" type="button">Отмена</button>`;
+}
+
 function sheetReceipt(id) {
   const c = data.checks.find((x) => x.id === id);
+  const back = isReturn(c);
+  const orig = back ? data.checks.find((x) => x.id === c.of) : null;
   return `
-    <h3>Чек</h3>
+    <h3>${back ? 'Возврат' : 'Чек'}</h3>
     <div class="sheetpaper">
-      <h4>Товарный чек № ${c.id.replace(/\D/g, '') || '1'}</h4>
-      <div class="meta">${new Date(c.at).toLocaleString('ru-RU')}, продал ${esc(c.by)}</div>
+      <h4>${back ? `Возврат № ${checkNo(c)}${orig ? ` по чеку № ${checkNo(orig)}` : ''}` : `Товарный чек № ${checkNo(c)}`}</h4>
+      <div class="meta">${new Date(c.at).toLocaleString('ru-RU')}, ${back ? 'оформил(а)' : 'продал'} ${esc(c.by)}</div>
       <table>
         <tr><th>Наименование</th><th class="r">Кол-во</th><th class="r">Цена</th><th class="r">Сумма</th></tr>
         ${c.lines.map((l) => `<tr><td>${esc(l.name)}</td><td class="r">${l.qty}</td>
@@ -2656,12 +2796,15 @@ function sheetReceipt(id) {
           ${(l.codes ?? []).length === 0 ? '' : `
             <tr><td colspan="4" class="meta" style="padding-top:0">
               ${l.codes.length > 1 ? 'коробки' : 'коробка'}: ${l.codes.map(esc).join(', ')}
-            </td></tr>`}`).join('')}
-        ${c.off ? `<tr><td colspan="3">Скидка</td><td class="r">−${som(c.off)}</td></tr>` : ''}
-        <tr><td colspan="3"><b>Итого</b></td><td class="r"><b>${som(c.total)}</b></td></tr>
+            </td></tr>`}
+          ${(l.ret ?? 0) > 0 ? `<tr><td colspan="4" class="meta" style="padding-top:0">возвращено ${l.ret} шт</td></tr>` : ''}`).join('')}
+        ${c.off ? `<tr><td colspan="3">Скидка</td><td class="r">${back ? '+' : '−'}${som(Math.abs(c.off))}</td></tr>` : ''}
+        <tr><td colspan="3"><b>${back ? 'Вернули покупателю' : 'Итого'}</b></td><td class="r"><b>${som(Math.abs(c.total))}</b></td></tr>
+        ${!back && c.refunded ? `<tr><td colspan="3">Возвращено по чеку</td><td class="r">−${som(c.refunded)}</td></tr>` : ''}
       </table>
-      <p style="margin:10px 0 0">Обмен и возврат — по чеку в течение 14 дней.</p>
+      ${back ? '' : `<p style="margin:10px 0 0">Обмен и возврат — по чеку в течение ${RETURN_DAYS} дней.</p>`}
     </div>
+    ${!back && checkLeft(c) > 0 ? '<button class="btn line" id="ret-open" type="button">Оформить возврат</button>' : ''}
     <button class="btn line" data-shut="1" type="button">Закрыть</button>`;
 }
 
@@ -2774,6 +2917,7 @@ function render() {
     : sheet.k === 'receipt' ? sheetReceipt(sheet.id)
     : sheet.k === 'close' ? sheetShift({ ...shiftSummary(), to: Date.now(), by: sellerName() }, 'close')
     : sheet.k === 'shiftview' ? sheetShift(data.shifts.find((x) => x.id === sheet.id), sheet.fresh ? 'done' : 'view')
+    : sheet.k === 'return' ? sheetReturn(sheet.id)
     : sheet.k === 'cam' ? sheetCam()
     : '';
   host.innerHTML = `<div class="veil" data-veil="1"><div class="sheet"><div class="grip"></div>${body}</div></div>`;
@@ -2809,7 +2953,8 @@ function sell() {
     const g = good(l.id);
     g.stock = Math.max(0, g.stock - l.qty);
     if (isSerial(g)) for (const code of l.codes ?? []) data.sold[code] = { at, id };
-    return { name: g.name, price: g.price, qty: l.qty, off: l.off, codes: l.codes ?? [] };
+    // id и закупка нужны возврату: по ним штуки возвращаются на остаток, а прибыль считается верно.
+    return { id: g.id, name: g.name, price: g.price, qty: l.qty, off: l.off, cost: g.cost, codes: l.codes ?? [] };
   });
 
   const entry = { id, at, by: sellerName(), byId: owner() ? 'owner' : me().id,
@@ -2921,6 +3066,65 @@ document.addEventListener('click', (event) => {
     return flash(`${s.name} убран(а). Прошлые чеки остаются`);
   }
 
+  /* возврат */
+  if (el.id === 'ret-open') {
+    const c = data.checks.find((x) => x.id === sheet?.id);
+    if (!c || isReturn(c)) return;
+    if (needName() || needOpen()) return;
+    if (!owner() && Date.now() - c.at > RETURN_DAYS * 86400e3) {
+      return flash(`Прошло больше ${RETURN_DAYS} дней — возврат оформляет владелец`);
+    }
+    retPick = {};
+    sheet = { k: 'return', id: c.id };
+    return render();
+  }
+  if (d.retcode !== undefined) {
+    const pick = (retPick[Number(d.retcode)] ??= { codes: [], n: 0 });
+    pick.codes = pick.codes.includes(d.code) ? pick.codes.filter((x) => x !== d.code) : [...pick.codes, d.code];
+    return render();
+  }
+  if (d.retmore !== undefined || d.retless !== undefined) {
+    const i = Number(d.retmore ?? d.retless);
+    const c = data.checks.find((x) => x.id === sheet?.id);
+    const pick = (retPick[i] ??= { codes: [], n: 0 });
+    pick.n = Math.max(0, Math.min(plainLeft(c.lines[i]), pick.n + (d.retmore !== undefined ? 1 : -1)));
+    return render();
+  }
+  if (el.id === 'ret-confirm') {
+    const c = data.checks.find((x) => x.id === sheet?.id);
+    if (!c || isReturn(c)) return;
+    if (needName() || needOpen()) return;
+    const q = returnQuote(c);
+    if (q.units === 0) return flash('Отметьте, что возвращают');
+
+    const at = Date.now();
+    const id = 'r' + at;
+    const lines = q.lines.map(({ i, n, off }) => {
+      const l = c.lines[i];
+      const codes = retPick[i].codes;
+      const g = lineGood(l);
+      const line = { id: l.id, name: l.name, price: l.price, qty: -n, off: -off, cost: unitCost(l), codes };
+      l.ret = (l.ret ?? 0) + n;
+      if (codes.length) l.retCodes = [...(l.retCodes ?? []), ...codes];
+      if (g) {
+        g.stock += n;
+        // Коробка снова в продаже: её опять можно пикнуть.
+        for (const code of codes) {
+          delete data.sold[code];
+          if (!g.codes.includes(code)) g.codes.push(code);
+        }
+      }
+      return line;
+    });
+    c.refunded = (c.refunded ?? 0) + q.refund;
+    data.checks.push({ id, at, by: sellerName(), byId: owner() ? 'owner' : me().id, kind: 'return', of: c.id,
+      total: -q.refund, cost: -q.cost, off: -(q.gross - q.refund), lines });
+    retPick = {};
+    sheet = { k: 'receipt', id };
+    save(); render();
+    return flash(`Возврат оформлен: верните покупателю ${som(q.refund)}`);
+  }
+
   /* открытие и закрытие смены */
   if (el.id === 'shift-open') {
     if (needName()) return;
@@ -2940,7 +3144,7 @@ document.addEventListener('click', (event) => {
     if (needName()) return;
     if (check.length) { sheet = null; render(); return flash('Сначала закончите или отмените чек'); }
     const summary = shiftSummary();
-    if (summary.checks === 0) { sheet = null; render(); return flash('В смене не было продаж — закрывать нечего'); }
+    if (shift().length === 0) { sheet = null; render(); return flash('В смене не было продаж — закрывать нечего'); }
     const to = Date.now();
     const rec = { id: 'sh' + to, ...summary, to, by: sellerName(), byId: owner() ? 'owner' : me().id };
     data.shifts.push(rec);
@@ -3228,7 +3432,7 @@ document.addEventListener('input', (event) => {
 
   // Отбор перерисовывает список под полем, поэтому возвращаем в поле
   // и место ввода: иначе с третьей буквы курсор прыгает в начало.
-  for (const [поле, запись] of [['q', (v) => { search = v; }], ['pick-q', (v) => { pick = v; }]]) {
+  for (const [поле, запись] of [['q', (v) => { search = v; }], ['pick-q', (v) => { pick = v; }], ['chk-q', (v) => { chkSearch = v; }]]) {
     if (id !== поле) continue;
     запись(event.target.value);
     const pos = event.target.selectionStart;

@@ -47,7 +47,7 @@ kassa('кассир продал и закрыл смену: итог, запи�
   assert.equal(r.checks, 1);
   assert.equal(r.units, 3);
   assert.equal(r.by, 'Нурбек');
-  assert.deepEqual(r.byWho, [{ name: 'Нурбек', n: 1, sum: 67600 }]);
+  assert.deepEqual(r.byWho, [{ name: 'Нурбек', n: 1, sum: 67600, ret: 0 }]);
   assert.deepEqual(r.items.map((i) => [i.name, i.qty]), [['Стекло защитное', 2], ['iPhone 13 128 ГБ', 1]]);
   assert.ok(r.to >= r.from);
 
@@ -166,7 +166,7 @@ kassa('несколько кассиров: разбивка по каждому
   await addCheck(k, { by: 'Нурбек', byId: 's1', total: 50, lines: [{ name: 'А', price: 50, qty: 1, off: 0 }] });
   await k.pickName();
   const r = await k.state(() => shiftSummary());
-  assert.deepEqual(r.byWho, [{ name: 'Айгерим', n: 1, sum: 500 }, { name: 'Нурбек', n: 2, sum: 150 }]);
+  assert.deepEqual(r.byWho, [{ name: 'Айгерим', n: 1, sum: 500, ret: 0 }, { name: 'Нурбек', n: 2, sum: 150, ret: 0 }]);
   assert.deepEqual(r.items, [{ name: 'А', qty: 2 }, { name: 'Б', qty: 2 }].sort((a, b) => b.qty - a.qty || 0));
   assert.equal(r.units, 4);
   assert.equal(r.avg, Math.round(650 / 3));
