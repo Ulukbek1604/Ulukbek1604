@@ -1257,6 +1257,8 @@ const SEED = {
   role: 'owner',
   /** Сколько кассир может скинуть с одной позиции без разрешения владельца. */
   limit: 500,
+  /** Ограничивать ли скидку кассира. Выключено — скидка любая, но не больше цены. */
+  limitOn: true,
   /**
    * Товар — это модель, а не коробка.
    *
@@ -1332,6 +1334,7 @@ const TABS = {
   ],
   cashier: [
     { id: 'sale',   icon: 'bag',    text: 'Продажа' },
+    { id: 'intake', icon: 'box',    text: 'Приём' },
     { id: 'goods',  icon: 'tag',    text: 'Цены' },
     { id: 'checks', icon: 'paper',  text: 'Мои чеки' },
     { id: 'more',   icon: 'people', text: 'Ещё' },
@@ -1451,21 +1454,29 @@ const DESK = typeof window !== 'undefined' ? window.kassa : null;
  * код на каждой коробке свой, — и поле стало списком. Данные, записанные
  * до этой перемены, переносим молча: магазин не должен ничего делать.
  */
+/**
+ * Штучный товар: код на каждой коробке свой (IMEI), и коробку можно
+ * продать один раз. Телефоны узнаются по памяти в названии, а ещё по
+ * тому, что у модели уже больше одного кода. Чехлы и стёкла — один код
+ * на все штуки, их пикают сколько нужно, пока есть остаток.
+ */
+const isSerial = (g) => !!(g.mem || g.ram) || g.codes.length > 1;
+
 function fixUp(d) {
   for (const g of d.goods ?? []) {
     if (!Array.isArray(g.codes)) g.codes = g.code ? [String(g.code)] : [];
     delete g.code;
     if (!g.model) g.model = g.name;
     // Телефоны и прочее с памятью — штучный товар, код на каждой коробке свой.
-    if (typeof g.serial !== 'boolean') g.serial = !!(g.mem || g.ram) || g.codes.length > 1;
   }
+  if (typeof d.limitOn !== 'boolean') d.limitOn = true;
   if (!Array.isArray(d.staff)) d.staff = [];
   if (!d.sold || typeof d.sold !== 'object') d.sold = {};
   if (!Array.isArray(d.shifts)) d.shifts = [];
   if (typeof d.shiftStart !== 'number') d.shiftStart = null;
   if (!d.shiftOpen || typeof d.shiftOpen.at !== 'number') d.shiftOpen = null;
   // Что продано до этой перемены, тоже считается проданным.
-  const штучные = new Set((d.goods ?? []).filter((g) => g.serial).map((g) => g.name));
+  const штучные = new Set((d.goods ?? []).filter(isSerial).map((g) => g.name));
   for (const c of d.checks ?? []) {
     for (const l of c.lines ?? []) {
       if (!штучные.has(l.name)) continue;
@@ -1550,6 +1561,8 @@ const som = (v) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const owner = () => data.role === 'owner';
 /** Выбранный кассир; пропадает, если владелец убрал его из списка. */
+/** Предел скидки действует на кассира и только когда владелец его включил. */
+const capped = () => !owner() && data.limitOn;
 const me = () => data.staff.find((s) => s.id === sellerId) ?? null;
 const sellerName = () => (owner() ? 'Владелец' : me()?.name ?? null);
 
@@ -1730,7 +1743,7 @@ function onScan(code) {
   if (tab === 'intake') {
     if (data.sold[code]) { flash(`Коробка ${code} уже продана ${soldDay(data.sold[code])}`); return; }
     // Штучный товар: знакомый код значит, что эту коробку уже принимали.
-    if (g?.serial) { flash(`Коробка ${code} уже принята: ${g.name}`); return; }
+    if (g && isSerial(g)) { flash(`Коробка ${code} уже принята: ${g.name}`); return; }
     if (g) { sheet = { k: 'take', id: g.id }; render(); }
     else {
       // Незнакомый код у телефона почти всегда значит не новый товар,
@@ -1750,7 +1763,7 @@ function onScan(code) {
     flash(`Код ${code} не найден${owner() ? '. Заведите товар в «Приёме»' : '. Позовите владельца'}`);
     return;
   }
-  if (g.serial && check.some((l) => l.id === g.id && l.codes.includes(code))) {
+  if (isSerial(g) && check.some((l) => l.id === g.id && l.codes.includes(code))) {
     flash('Эта коробка уже в чеке');
     return;
   }
@@ -1905,7 +1918,7 @@ function viewIntake() {
           <button class="plain grow" type="button" data-edit="${g.id}">
             <div class="t">${esc(g.name)}</div>
             <div class="q2 n">${esc(codeLabel(g))}</div>
-            <div class="q2 n">закуп ${som(g.cost)}, наценка ${markup(g)}%</div>
+            ${owner() ? `<div class="q2 n">закуп ${som(g.cost)}, наценка ${markup(g)}%</div>` : ''}
           </button>
           <div style="text-align:right">
             <div class="amt n">${som(g.price)}</div>
@@ -1914,6 +1927,45 @@ function viewIntake() {
         </div>`).join('')}
     </div>
     <button class="btn line" id="good-new" type="button">${svg('plus')}Завести товар руками</button>`;
+}
+
+/** За какой срок показывать, кто сколько продал. */
+let repPeriod = 'shift';
+const PERIODS = [['shift', 'Смена'], ['today', 'Сегодня'], ['7', '7 дней'], ['30', '30 дней'], ['all', 'Всё время']];
+
+function periodChecks(p) {
+  const day = new Date(); day.setHours(0, 0, 0, 0);
+  const from = day.getTime();
+  if (p === 'shift') return shift();
+  if (p === 'today') return data.checks.filter((c) => c.at >= from);
+  if (p === '7') return data.checks.filter((c) => c.at >= from - 6 * 86400e3);
+  if (p === '30') return data.checks.filter((c) => c.at >= from - 29 * 86400e3);
+  return data.checks;
+}
+
+/** Кто сколько продал: чеки, штуки и выручка по каждому человеку за выбранный срок. */
+function whoSold() {
+  const people = new Map();
+  for (const c of periodChecks(repPeriod)) {
+    const r = people.get(c.by) ?? { name: c.by, n: 0, units: 0, sum: 0, profit: 0 };
+    r.n += 1;
+    r.units += c.lines.reduce((a, l) => a + l.qty, 0);
+    r.sum += c.total;
+    r.profit += c.total - c.cost;
+    people.set(c.by, r);
+  }
+  const rows = [...people.values()].sort((a, b) => b.sum - a.sum);
+  return `
+    <h2>Кто сколько продал</h2>
+    <div class="chipsrow" style="margin-bottom:12px">
+      ${PERIODS.map(([id, text]) => `<button class="chipx" type="button" data-period="${id}" aria-pressed="${repPeriod === id}">${text}</button>`).join('')}
+    </div>
+    ${rows.length === 0 ? '<p class="q">За этот срок продаж не было.</p>' : `
+      <div class="rows">${rows.map((r) => `
+        <div class="row"><div class="grow"><div class="t">${esc(r.name)}</div>
+          <div class="q2">${r.n} ${plural(r.n, 'чек', 'чека', 'чеков')}, ${r.units} шт</div></div>
+          <div style="text-align:right"><div class="amt n">${som(r.sum)}</div>
+            ${owner() ? `<div class="q2 n" style="color:var(--money)">${som(r.profit)}</div>` : ''}</div></div>`).join('')}</div>`}`;
 }
 
 function viewReport() {
@@ -1938,18 +1990,7 @@ function viewReport() {
       <div class="figure"><b>${som(stockCost)}</b><span>денег в товаре</span></div>
     </div>
 
-    ${(() => {
-      const byWho = new Map();
-      for (const c of shiftList) {
-        const r = byWho.get(c.by) ?? { n: 0, sum: 0 };
-        r.n += 1; r.sum += c.total; byWho.set(c.by, r);
-      }
-      if (byWho.size === 0) return '';
-      return `<h2>По кассирам</h2><div class="rows">${[...byWho].map(([name, r]) => `
-        <div class="row"><div class="grow"><div class="t">${esc(name)}</div>
-          <div class="q2">${r.n} ${plural(r.n, 'чек', 'чека', 'чеков')}</div></div>
-          <div class="amt n">${som(r.sum)}</div></div>`).join('')}</div>`;
-    })()}
+    ${whoSold()}
 
     <h2>Как идёт торговля</h2>
     <div id="charts" style="display:grid;gap:12px;position:relative">
@@ -2116,10 +2157,16 @@ function viewMore() {
 
       <h2>Предел скидки кассира</h2>
       <div class="rows" style="padding:13px">
-        <p class="q" style="margin:0 0 10px">Больше этой суммы с одной позиции кассир скинуть не сможет. Ноль — скидки запрещены.</p>
+        <div class="row" style="padding-top:0">
+          <div class="grow"><div class="q2">Ограничивать скидку кассира</div>
+            <div class="t">${data.limitOn ? 'Да, есть предел' : 'Нет, скидка любая'}</div></div>
+          <button class="btn line" id="limit-toggle" type="button" style="width:auto;margin:0;padding:8px 14px">${data.limitOn ? 'выключить' : 'включить'}</button>
+        </div>
+        ${data.limitOn ? `
+        <p class="q" style="margin:12px 0 10px">Больше этой суммы с одной позиции кассир скинуть не сможет. Ноль — скидки запрещены.</p>
         <label class="fld" style="margin-bottom:0"><span>Сомов с позиции</span>
           <input id="limit" type="number" inputmode="numeric" value="${data.limit}" min="0"></label>
-        <button class="btn" id="limit-save" type="button">Сохранить</button>
+        <button class="btn" id="limit-save" type="button">Сохранить</button>` : ''}
       </div>
 
       <h2>Ваш код</h2>
@@ -2129,7 +2176,9 @@ function viewMore() {
       </div>
 `
       : `<h2>Смена</h2>
-         <p class="q">Скинуть можно до <b class="n">${som(data.limit)}</b> с одной позиции — предел задаёт владелец.</p>`}
+         <p class="q">${data.limitOn
+           ? `Скинуть можно до <b class="n">${som(data.limit)}</b> с одной позиции — предел задаёт владелец.`
+           : 'Скидку можно давать любую, но не больше цены товара.'}</p>`}
 
     <h2>Что прислала пикалка</h2>
     <div class="rows" style="padding:13px">
@@ -2218,7 +2267,7 @@ function sheetOff(id) {
   const l = check.find((x) => x.id === id);
   const g = good(id);
   const sum = g.price * l.qty;
-  const cap = owner() ? sum : Math.min(data.limit * l.qty, sum);
+  const cap = capped() ? Math.min(data.limit * l.qty, sum) : sum;
 
   return `
     <h3>Скидка на ${esc(g.name)}</h3>
@@ -2238,9 +2287,9 @@ function sheetOff(id) {
     </div>
     <p class="q2">Можно задать любое из двух: впишете «отдать за 300» — скидка посчитается сама.</p>
 
-    ${owner()
-      ? '<p class="q2">Вы владелец, предел на вас не действует.</p>'
-      : `<p class="q2">Ваш предел — ${som(data.limit)} с позиции${l.qty > 1 ? `, то есть ${som(cap)} на ${l.qty} шт` : ''}.</p>`}
+    ${capped()
+      ? `<p class="q2">Ваш предел — ${som(data.limit)} с позиции${l.qty > 1 ? `, то есть ${som(cap)} на ${l.qty} шт` : ''}.</p>`
+      : '<p class="q2">Скидка без предела: главное, чтобы цена не ушла ниже нуля.</p>'}
 
     <button class="btn" data-offsave="${id}" type="button">Применить</button>
     <button class="btn line" data-shut="1" type="button">Отмена</button>`;
@@ -2353,13 +2402,6 @@ function sheetNewGood() {
 
     <p class="q2" style="margin:-4px 0 14px">Получится: <b>${имя ? esc(имя) : '…'}</b></p>
 
-    <div class="cuts" style="margin-bottom:6px">
-      <button class="cut" type="button" data-ngserial="1" aria-pressed="${ng.serial}">У каждой штуки свой код (IMEI)</button>
-    </div>
-    <p class="q2" style="margin:0 0 14px">${ng.serial
-      ? 'Каждую коробку можно продать один раз: повторный пик того же кода не пройдёт.'
-      : 'Код один на все штуки (чехлы, стёкла): пикать можно сколько угодно, пока есть остаток.'}</p>
-
     <div class="pair">
       <label class="fld"><span>Пришло по, сом</span>
         <input id="ng-cost" type="number" inputmode="numeric" value="${esc(ng.cost)}" placeholder="закуп"></label>
@@ -2373,8 +2415,9 @@ function sheetNewGood() {
     <p class="q2">Наценка и цена связаны: меняете одно — пересчитывается другое.</p>
     ${ng.bad === 'price' ? '<p class="q2" style="color:var(--red);margin:-6px 0 10px">Нужна цена продажи.</p>' : ''}
 
+    ${ng.code ? '' : `
     <label class="fld"><span>Сколько пришло, шт</span>
-      <input id="ng-qty" type="number" inputmode="numeric" value="${esc(ng.qty)}" min="1"></label>
+      <input id="ng-qty" type="number" inputmode="numeric" value="${esc(ng.qty)}" min="1"></label>`}
 
     <button class="btn" id="ng-save" type="button">Завести и принять</button>
     <button class="btn line" data-shut="1" type="button">Отмена</button>`;
@@ -2415,9 +2458,9 @@ function ngRead() {
 function sheetWhole() {
   const t = total();
   const построчно = t.off - t.whole;
-  const room = owner()
-    ? Math.max(0, t.gross - построчно)
-    : Math.max(0, Math.min(data.limit * t.count, t.gross) - построчно);
+  const room = capped()
+    ? Math.max(0, Math.min(data.limit * t.count, t.gross) - построчно)
+    : Math.max(0, t.gross - построчно);
 
   return `
     <h3>Скидка на чек</h3>
@@ -2438,9 +2481,9 @@ function sheetWhole() {
     </div>
     <p class="q2">Можно задать любое из двух: впишете «отдать за 11 500» — скидка посчитается сама.</p>
 
-    ${owner()
-      ? '<p class="q2">Вы владелец, предел на вас не действует.</p>'
-      : `<p class="q2">Ваш предел — ${som(data.limit)} с позиции, на этот чек ${som(room)}${построчно ? ` (${som(построчно)} уже скинуто по строкам)` : ''}.</p>`}
+    ${capped()
+      ? `<p class="q2">Ваш предел — ${som(data.limit)} с позиции, на этот чек ${som(room)}${построчно ? ` (${som(построчно)} уже скинуто по строкам)` : ''}.</p>`
+      : '<p class="q2">Скидка без предела: главное, чтобы цена не ушла ниже нуля.</p>'}
 
     <button class="btn" id="whole-save" type="button">Применить</button>
     <button class="btn line" data-shut="1" type="button">Отмена</button>`;
@@ -2487,6 +2530,7 @@ function sheetTake(id) {
   return `
     <h3>${esc(g.name)}</h3>
     <p class="q">Товар знакомый, на остатке ${g.stock} шт. Сколько пришло ещё?</p>
+    ${owner() ? `
     <div class="pair">
       <label class="fld"><span>Пришло, шт</span><input id="tk-qty" type="number" inputmode="numeric" value="1" min="1"></label>
       <label class="fld"><span>Пришло по, сом</span><input id="tk-cost" type="number" inputmode="numeric" value="${g.cost}"></label>
@@ -2494,7 +2538,8 @@ function sheetTake(id) {
     <div class="pair">
       <label class="fld"><span>Наценка, %</span><input id="tk-markup" type="number" inputmode="numeric" value="${markup(g)}"></label>
       <label class="fld"><span>Продаём по, сом</span><input id="tk-price" type="number" inputmode="numeric" value="${g.price}"></label>
-    </div>
+    </div>` : `
+    <label class="fld"><span>Пришло, шт</span><input id="tk-qty" type="number" inputmode="numeric" value="1" min="1"></label>`}
     <button class="btn" data-tksave="${id}" type="button">Принять</button>
     <button class="btn line" data-shut="1" type="button">Отмена</button>`;
 }
@@ -2517,17 +2562,15 @@ function sheetEdit(id) {
       ${g.codes.length > 8 ? `<p class="q2" style="margin:-4px 0 10px">Показаны последние 8 из ${g.codes.length}.</p>` : ''}`}
     <label class="fld"><span>Привязать ещё код</span>
       <input id="ed-code" class="n" value="" placeholder="пикните или введите"></label>
+    ${owner() ? `
     <div class="pair">
       <label class="fld"><span>Закуп, сом</span><input id="ed-cost" type="number" inputmode="numeric" value="${g.cost}"></label>
       <label class="fld"><span>Продажа, сом</span><input id="ed-price" type="number" inputmode="numeric" value="${g.price}"></label>
     </div>
     <label class="fld"><span>Остаток, шт</span><input id="ed-stock" type="number" inputmode="numeric" value="${g.stock}" min="0"></label>
-    <div class="cuts" style="margin-bottom:10px">
-      <button class="cut" type="button" data-edserial="${g.id}" aria-pressed="${g.serial}">У каждой штуки свой код (IMEI)</button>
-    </div>
-    <p class="q2">Наценка сейчас ${markup(g)} %, с одной штуки зарабатываете ${som(g.price - g.cost)}.</p>
+    <p class="q2">Наценка сейчас ${markup(g)} %, с одной штуки зарабатываете ${som(g.price - g.cost)}.</p>` : ''}
     <button class="btn" data-edsave="${id}" type="button">Сохранить</button>
-    <button class="btn line" data-eddel="${id}" type="button">Убрать товар</button>
+    ${owner() ? `<button class="btn line" data-eddel="${id}" type="button">Убрать товар</button>` : ''}
     <button class="btn line" data-shut="1" type="button">Отмена</button>`;
 }
 
@@ -2755,7 +2798,7 @@ function sell() {
   for (const l of check) {
     const g = good(l.id);
     if (l.qty > g.stock) return flash(`${g.name}: на остатке ${g.stock} шт, в чеке ${l.qty}`);
-    for (const code of g.serial ? l.codes ?? [] : []) {
+    for (const code of isSerial(g) ? l.codes ?? [] : []) {
       if (data.sold[code]) return flash(`Коробка ${code} уже продана`);
     }
   }
@@ -2765,7 +2808,7 @@ function sell() {
   const lines = check.map((l) => {
     const g = good(l.id);
     g.stock = Math.max(0, g.stock - l.qty);
-    if (g.serial) for (const code of l.codes ?? []) data.sold[code] = { at, id };
+    if (isSerial(g)) for (const code of l.codes ?? []) data.sold[code] = { at, id };
     return { name: g.name, price: g.price, qty: l.qty, off: l.off, codes: l.codes ?? [] };
   });
 
@@ -2843,6 +2886,8 @@ document.addEventListener('click', (event) => {
   if (el.id === 'cam-open') { sheet = { k: 'cam' }; return render(); }
   if (el.id === 'cam-close') { camStop(); sheet = null; return render(); }
   if (d.tab) { tab = d.tab; sheet = null; render(); document.getElementById('screen').scrollTop = 0; return; }
+
+  if (d.period) { repPeriod = d.period; return render(); }
 
   /* кто за кассой */
   if (d.who) {
@@ -2944,9 +2989,9 @@ document.addEventListener('click', (event) => {
   if (el.id === 'whole-save') {
     const t = total();
     const построчно = t.off - t.whole;
-    const room = owner()
-      ? Math.max(0, t.gross - построчно)
-      : Math.max(0, Math.min(data.limit * t.count, t.gross) - построчно);
+    const room = capped()
+      ? Math.max(0, Math.min(data.limit * t.count, t.gross) - построчно)
+      : Math.max(0, t.gross - построчно);
 
     const typedOff = Number(document.getElementById('whole-value').value);
     const typedFinal = Number(document.getElementById('whole-final').value);
@@ -2955,9 +3000,9 @@ document.addEventListener('click', (event) => {
     const off = Math.max(0, Math.round(want));
 
     if (off > room) {
-      return flash(owner()
-        ? `Больше ${som(room)} скинуть нельзя`
-        : `Ваш предел на этот чек — ${som(room)}. Позовите владельца`);
+      return flash(capped()
+        ? `Ваш предел на этот чек — ${som(room)}. Позовите владельца`
+        : `Больше ${som(room)} скинуть нельзя`);
     }
     checkOff = off;
     sheet = null; settle = true; return render();
@@ -2973,7 +3018,7 @@ document.addEventListener('click', (event) => {
     const l = check.find((x) => x.id === d.offsave);
     const g = good(d.offsave);
     const sum = g.price * l.qty;
-    const cap = owner() ? sum : Math.min(data.limit * l.qty, sum);
+    const cap = capped() ? Math.min(data.limit * l.qty, sum) : sum;
 
     const typedOff = Number(document.getElementById('off-value').value);
     const typedFinal = Number(document.getElementById('off-final').value);
@@ -2982,9 +3027,9 @@ document.addEventListener('click', (event) => {
     const off = Math.max(0, Math.round(want));
 
     if (off > cap) {
-      return flash(owner()
-        ? `Больше ${som(sum)} скинуть нельзя`
-        : `Ваш предел — ${som(cap)}. Позовите владельца`);
+      return flash(capped()
+        ? `Ваш предел — ${som(cap)}. Позовите владельца`
+        : `Больше ${som(sum)} скинуть нельзя`);
     }
     l.off = off;
     sheet = null; settle = true; return render();
@@ -3002,7 +3047,7 @@ document.addEventListener('click', (event) => {
 
   /* приём */
   const ngFresh = (code) => ({ code, model: '', ram: '', mem: '', color: '',
-                               cost: '', markup: 100, price: '', qty: 1, bad: null, serial: true });
+                               cost: '', markup: 100, price: '', qty: 1, bad: null });
 
   if (el.id === 'good-new') { ng = ngFresh(''); sheet = { k: 'newgood' }; return render(); }
   if (el.id === 'ng-open') { ng = ngFresh(sheet?.code ?? ''); sheet = { k: 'newgood' }; return render(); }
@@ -3022,7 +3067,6 @@ document.addEventListener('click', (event) => {
   }
 
   // Кнопка-подсказка памяти или цвета: повторное нажатие снимает выбор.
-  if (d.ngserial) { ngRead(); ng.serial = !ng.serial; return render(); }
   if (d.ngset) {
     ngRead();
     ng[d.ngset] = ng[d.ngset] === d.ngval ? '' : d.ngval;
@@ -3033,7 +3077,9 @@ document.addEventListener('click', (event) => {
     const name = ngName();
     const cost = Number(ng.cost);
     const price = Number(ng.price);
-    const qty = Math.max(1, Number(ng.qty) || 1);
+    // С пикнутой коробки приходит ровно одна штука; число спрашиваем только
+    // когда товар заводят руками, без кода.
+    const qty = ng.code ? 1 : Math.max(1, Number(ng.qty) || 1);
 
     // Промах показываем у самого поля: подпись внизу экрана, в трёхстах
     // точках от кнопки, человек просто не замечает — и решает, что
@@ -3057,7 +3103,6 @@ document.addEventListener('click', (event) => {
       mem: String(ng.mem).trim(),
       color: String(ng.color).trim(),
       cost, price,
-      serial: ng.serial,
       stock: qty,
       at: Date.now(),
     });
@@ -3069,18 +3114,16 @@ document.addEventListener('click', (event) => {
     const g = good(d.tksave);
     const qty = Number(document.getElementById('tk-qty').value) || 1;
     g.stock += Math.max(1, qty);
-    g.cost = Number(document.getElementById('tk-cost').value) || g.cost;
-    g.price = Number(document.getElementById('tk-price').value) || g.price;
+    // Закупку и цену меняет только владелец: у кассира этих полей нет.
+    const costField = document.getElementById('tk-cost');
+    const priceField = document.getElementById('tk-price');
+    if (costField) g.cost = Number(costField.value) || g.cost;
+    if (priceField) g.price = Number(priceField.value) || g.price;
     g.at = Date.now();
     sheet = null; save(); render();
     return flash(`${g.name}: стало ${g.stock} шт`);
   }
   if (d.edit) { sheet = { k: 'edit', id: d.edit }; return render(); }
-  if (d.edserial) {
-    const g = good(d.edserial);
-    g.serial = !g.serial;
-    save(); return render();
-  }
   if (d.edsave) {
     const g = good(d.edsave);
     const name = document.getElementById('ed-name').value.trim();
@@ -3092,9 +3135,12 @@ document.addEventListener('click', (event) => {
       if (!g.codes.includes(code)) g.codes.push(code);
     }
     g.name = name;
-    g.cost = Number(document.getElementById('ed-cost').value) || g.cost;
-    g.price = Number(document.getElementById('ed-price').value) || g.price;
-    g.stock = Math.max(0, Number(document.getElementById('ed-stock').value) || 0);
+    // Цены и остаток правит только владелец: у кассира этих полей нет.
+    if (owner()) {
+      g.cost = Number(document.getElementById('ed-cost').value) || g.cost;
+      g.price = Number(document.getElementById('ed-price').value) || g.price;
+      g.stock = Math.max(0, Number(document.getElementById('ed-stock').value) || 0);
+    }
     sheet = null; save(); render();
     return flash('Сохранено');
   }
@@ -3105,6 +3151,7 @@ document.addEventListener('click', (event) => {
     return flash('Код отвязан');
   }
   if (d.eddel) {
+    if (!owner()) return;
     data.goods = data.goods.filter((g) => g.id !== d.eddel);
     check = check.filter((l) => l.id !== d.eddel);
     sheet = null; save(); render();
@@ -3121,6 +3168,11 @@ document.addEventListener('click', (event) => {
   if (d.receipt) { sheet = { k: 'receipt', id: d.receipt }; return render(); }
 
   /* настройки */
+  if (el.id === 'limit-toggle') {
+    data.limitOn = !data.limitOn;
+    save(); render();
+    return flash(data.limitOn ? 'Предел скидки включён' : 'Предел скидки выключен');
+  }
   if (el.id === 'limit-save') {
     data.limit = Math.max(0, Number(document.getElementById('limit').value) || 0);
     save(); render();

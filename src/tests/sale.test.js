@@ -243,28 +243,51 @@ kassa('приём: новая коробка той же модели добав
   assert.equal(await k.state(() => good('g1').stock), 4);
 });
 
-kassa('карточка нового товара: штучный по умолчанию, переключается', { role: 'owner' }, async (k) => {
+kassa('карточка нового товара: кнопки IMEI нет, штука с пикнутой коробки одна', { role: 'owner' }, async (k) => {
+  await k.page.click('[data-tab="intake"]');
+  await k.scan('NEW-BOX-1');
+  await k.page.click('#ng-open');
+  assert.equal(await k.page.locator('[data-ngserial]').count(), 0);
+  assert.equal(await k.page.locator('#ng-qty').count(), 0, 'поля «сколько штук» нет');
+  await k.page.fill('#ng-model', 'iPhone 12');
+  await k.page.click('[data-ngset="mem"][data-ngval="64 ГБ"]');
+  await k.page.fill('#ng-cost', '40000');
+  await k.page.fill('#ng-price', '48000');
+  await k.page.click('#ng-save');
+  const g = await k.state(() => data.goods.at(-1));
+  assert.equal(g.stock, 1);
+  assert.deepEqual(g.codes, ['NEW-BOX-1']);
+  assert.equal(g.serial, undefined, 'отметка не хранится');
+  assert.equal(await k.state(() => isSerial(data.goods.at(-1))), true);
+});
+
+kassa('товар руками без кода: количество спрашиваем', { role: 'owner' }, async (k) => {
   await k.page.click('[data-tab="intake"]');
   await k.page.click('#good-new');
-  assert.equal(await k.page.getAttribute('[data-ngserial]', 'aria-pressed'), 'true');
+  assert.equal(await k.page.locator('#ng-qty').count(), 1);
   await k.page.fill('#ng-model', 'Чехол прозрачный');
   await k.page.fill('#ng-cost', '100');
   await k.page.fill('#ng-price', '300');
-  await k.page.click('[data-ngserial]');
-  assert.equal(await k.page.getAttribute('[data-ngserial]', 'aria-pressed'), 'false');
-  assert.equal(await k.page.inputValue('#ng-model'), 'Чехол прозрачный', 'введённое не стёрлось');
+  await k.page.fill('#ng-qty', '12');
   await k.page.click('#ng-save');
-  const g = await k.state(() => data.goods.at(-1));
-  assert.equal(g.name, 'Чехол прозрачный');
-  assert.equal(g.serial, false);
+  assert.equal(await k.state(() => data.goods.at(-1).stock), 12);
 });
 
-kassa('правка товара: отметка IMEI переключается и сохраняется', { role: 'owner' }, async (k) => {
+kassa('правка товара: кнопки IMEI нет', { role: 'owner' }, async (k) => {
   await k.page.click('[data-tab="intake"]');
   await k.page.click('[data-edit="g6"]');
-  assert.equal(await k.page.getAttribute('[data-edserial]', 'aria-pressed'), 'false');
-  await k.page.click('[data-edserial="g6"]');
-  assert.equal(await k.state(() => good('g6').serial), true);
+  assert.equal(await k.page.locator('[data-edserial]').count(), 0);
+});
+
+kassa('штучный товар определяется сам: память, несколько кодов', async (k) => {
+  const r = await k.state(() => ({
+    phone: isSerial(good('g1')),
+    glass: isSerial(good('g6')),
+    twoCodes: isSerial({ codes: ['1', '2'] }),
+    oneCode: isSerial({ codes: ['1'] }),
+    ram: isSerial({ codes: [], ram: '8' }),
+  }));
+  assert.deepEqual(r, { phone: true, glass: false, twoCodes: true, oneCode: false, ram: true });
 });
 
 /* ---------------------------------------------------- чеки и отчёты */
@@ -305,7 +328,7 @@ kassa('«Мои чеки»: кассир видит только свои', asyn
   assert.deepEqual(await k.state(() => mine().map((c) => c.id)), ['a']);
 });
 
-kassa('отчёт: блок «По кассирам» суммирует чеки смены', { role: 'owner' }, async (k) => {
+kassa('отчёт: «Кто сколько продал» суммирует чеки смены', { role: 'owner' }, async (k) => {
   await k.state(() => {
     data.checks = [
       { id: 'a', at: Date.now() - 1000, by: 'Айгерим', total: 100, cost: 0, off: 0, lines: [] },
@@ -315,7 +338,7 @@ kassa('отчёт: блок «По кассирам» суммирует чек�
   });
   await k.page.click('[data-tab="report"]');
   const t = await k.text();
-  assert.match(t, /По кассирам/);
+  assert.match(t, /Кто сколько продал/);
   assert.match(t, /Айгерим[\s\S]*2 чека[\s\S]*150/);
   assert.match(t, /Нурбек[\s\S]*1 чек[\s\S]*30/);
 });
@@ -366,8 +389,8 @@ kassa('старые данные без кассиров и отметки IMEI 
 }, async (k) => {
   const d = await k.state(() => ({ goods: data.goods, staff: data.staff, sold: data.sold }));
   assert.deepEqual(d.goods[0].codes, ['111']);
-  assert.equal(d.goods[0].serial, true);
-  assert.equal(d.goods[1].serial, false);
+  assert.equal(await k.state(() => isSerial(data.goods[0])), true);
+  assert.equal(await k.state(() => isSerial(data.goods[1])), false);
   assert.ok(Array.isArray(d.staff));
   assert.ok(d.sold['999'], 'код из старого чека считается проданным');
   await k.pickName('s1');
