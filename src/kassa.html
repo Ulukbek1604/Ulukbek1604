@@ -1084,7 +1084,7 @@ function buildWorkbook() {
   const cost = checks.reduce((s, c) => s + c.cost, 0);
 
   const summary = [
-    ['Отчёт магазина «Телефоны и чехлы»'],
+    [`Отчёт магазина «${data.shopName}»`],
     ['Составлен', new Date().toLocaleString('ru-RU')],
     ['Период', `${day(checks[0]?.at ?? Date.now())} — ${day(checks.at(-1)?.at ?? Date.now())}`],
     [],
@@ -1170,8 +1170,16 @@ function buildWorkbook() {
     ...data.intakes.map((i) => [day(i.at), time(i.at), i.by, i.name, i.qty, INTAKE_KIND[i.kind] ?? i.kind, i.code ?? '']),
   ];
 
+  const invRows = [
+    ['Дата', 'Провёл(а)', 'Товар', 'По учёту', 'По факту', 'Разница', 'Сумма по закупу'],
+    ...data.inventories.flatMap((r) => r.lines.map((l) => [
+      `${day(r.at)} ${time(r.at)}`, r.by, l.name, l.was, l.now, l.diff, l.diff * l.cost,
+    ])),
+  ];
+
   return makeWorkbook([
     { name: 'Сводка', rows: summary, widths: [34, 16, 52, 52] },
+    { name: 'Инвентаризации', rows: invRows, widths: [18, 16, 34, 10, 10, 10, 16] },
     { name: 'Приёмка', rows: intakeRows, widths: [12, 9, 16, 34, 9, 16, 18] },
     { name: 'Смены', rows: shiftRows, widths: [18, 18, 16, 16, 8, 8, 12, 14, 12, 10, 10, 12] },
     { name: 'Товары', rows: goods, widths: [30, 16, 10, 10, 11, 9, 18, 9, 15, 12, 12, 15] },
@@ -1222,7 +1230,7 @@ function exportWorkbook() {
 <div id="app" class="desk">
   <header class="top">
     <div class="toprow">
-      <span class="place">Телефоны и чехлы</span>
+      <span class="place" id="shop">Телефоны и чехлы</span>
       <span class="link" id="link" title="Связь с интернетом"></span>
       <span class="who" id="who">Владелец</span>
     </div>
@@ -1328,6 +1336,11 @@ const SEED = {
   shiftOpen: null,
   /** Журнал приёмки: кто, когда и что принял. */
   intakes: [],
+  /** Название магазина: в шапке, на чеках и в выгрузке. Меняет владелец. */
+  shopName: 'Телефоны и чехлы',
+  /** Проведённые инвентаризации и начатая, но не законченная. */
+  inventories: [],
+  invDraft: null,
   notes: [],
 };
 
@@ -1482,6 +1495,9 @@ function fixUp(d) {
   }
   if (typeof d.limitOn !== 'boolean') d.limitOn = true;
   if (!Array.isArray(d.intakes)) d.intakes = [];
+  if (typeof d.shopName !== 'string' || !d.shopName.trim()) d.shopName = 'Телефоны и чехлы';
+  if (!Array.isArray(d.inventories)) d.inventories = [];
+  if (!d.invDraft || typeof d.invDraft.counts !== 'object') d.invDraft = null;
   if (!Array.isArray(d.staff)) d.staff = [];
   if (!d.sold || typeof d.sold !== 'object') d.sold = {};
   if (!Array.isArray(d.shifts)) d.shifts = [];
@@ -1670,7 +1686,23 @@ function logIntake(g, qty, kind, code) {
   if (data.intakes.length > 2000) data.intakes = data.intakes.slice(-2000);
 }
 
-const INTAKE_KIND = { box: 'коробка', qty: 'партия', new: 'новый товар', 'new-box': 'новый товар', fix: 'правка остатка' };
+const INTAKE_KIND = { box: 'коробка', qty: 'партия', new: 'новый товар', 'new-box': 'новый товар', fix: 'правка остатка', inv: 'инвентаризация' };
+
+function inventoriesBox() {
+  const rows = data.inventories.slice(-10).reverse();
+  return `
+    <h2>Инвентаризации</h2>
+    ${rows.length === 0 ? '<p class="q">Пока ни одной. Запускается в «Приёме».</p>' : `
+      <div class="rows">${rows.map((r) => {
+        const value = r.lines.reduce((s, l) => s + l.diff * l.cost, 0);
+        return `<div class="row">
+          <button class="plain grow" type="button" data-invview="${r.id}">
+            <div class="t">${stamp(r.at)}, ${esc(r.by)}</div>
+            <div class="q2">посчитано ${r.counted}, расхождений ${r.lines.length}</div>
+          </button>
+          <div class="amt n" style="color:${value < 0 ? 'var(--alarm)' : 'var(--ink)'}">${som(value)}</div></div>`;
+      }).join('')}</div>`}`;
+}
 
 function intakeBox() {
   const rows = data.intakes.slice(-15).reverse();
@@ -1706,7 +1738,7 @@ function shiftSummary() {
     openedBy: data.shiftOpen?.by ?? null,
     checks: sales, units, revenue, cost, profit: revenue - cost, off,
     returns, refunds,
-    received: data.intakes.filter((i) => i.kind !== 'fix' && i.at >= (data.shiftStart ?? Date.now() - 12 * 3600e3))
+    received: data.intakes.filter((i) => i.kind !== 'fix' && i.kind !== 'inv' && i.at >= (data.shiftStart ?? Date.now() - 12 * 3600e3))
       .reduce((a, i) => a + i.qty, 0),
     avg: sales ? Math.round(salesSum / sales) : 0,
     byWho: [...byWho.values()].sort((a, b) => b.sum - a.sum),
@@ -1717,6 +1749,7 @@ function shiftSummary() {
 /** Итог словами — чтобы отправить хозяину сообщением. Прибыль только владельцу. */
 function shiftText(r) {
   return [
+    data.shopName,
     `Смена ${stamp(r.from)} — ${stamp(r.to)}${r.openedBy ? `, открыл(а) ${r.openedBy}` : ''}, закрыл(а) ${r.by}`,
     `Выручка: ${som(r.revenue)}`,
     ...(owner() ? [`Прибыль: ${som(r.profit)}`] : []),
@@ -1990,10 +2023,102 @@ function viewSale() {
     </div>`;
 }
 
+/** Поиск в списке инвентаризации. */
+let invSearch = '';
+
+/**
+ * Расхождения начатой инвентаризации.
+ *
+ * Разница считается от остатка на момент пересчёта (base), а не от
+ * нынешнего: продажи в магазине идут и во время подсчёта, и считать
+ * недостачей то, что просто продали, нельзя.
+ */
+function invDiffs() {
+  const d = data.invDraft;
+  if (!d) return [];
+  return Object.entries(d.counts)
+    .map(([id, c]) => ({ g: good(id), n: c.n, base: c.base }))
+    .filter((x) => x.g && x.n !== x.base)
+    .map((x) => ({ ...x, diff: x.n - x.base }));
+}
+const invLines = (diffs) => diffs.map(({ g, n, base, diff }) => ({ id: g.id, name: g.name, was: base, now: n, diff, cost: g.cost }));
+const signed_ = (n) => (n > 0 ? '+' : '') + n;
+
+function viewInventory() {
+  const d = data.invDraft;
+  if (!owner() || !d) return viewIntake();
+  const q = invSearch.trim().toLowerCase();
+  const list = data.goods.filter((g) => !q || g.name.toLowerCase().includes(q) || g.codes.some((c) => c.toLowerCase().includes(q)));
+  const counted = Object.keys(d.counts).filter((id) => good(id)).length;
+  return `
+    <p class="hint">Инвентаризация с ${stamp(d.at)}. Пересчитайте товар и впишите, сколько есть на самом деле. Пустое поле — не считали, остаток не изменится. Продавать можно как обычно.</p>
+    <div class="figures">
+      <div class="figure"><b id="inv-n">${counted} из ${data.goods.length}</b><span>посчитано</span></div>
+      <div class="figure"><b id="inv-z">${invDiffs().length}</b><span>расхождений</span></div>
+    </div>
+    <div class="search" style="margin-top:12px">
+      ${svg('scan', 18)}
+      <input id="inv-q" value="${esc(invSearch)}" placeholder="Название или код" autocomplete="off">
+      ${invSearch ? `<button class="plain" id="inv-q-clear" type="button" aria-label="Очистить">${svg('cross', 16)}</button>` : ''}
+    </div>
+    <div class="rows">
+      ${list.length === 0 ? '<p class="q" style="padding:12px 0">Ничего не нашлось.</p>' : list.map((g) => {
+        const c = d.counts[g.id];
+        return `<div class="row">
+          <div class="grow"><div class="t">${esc(g.name)}</div>
+            <div class="q2 n">по учёту ${g.stock} шт <b id="inv-d-${g.id}">${c ? invDiffText(c.n, c.base) : ''}</b></div></div>
+          <input data-inv="${g.id}" type="number" inputmode="numeric" min="0" value="${c ? c.n : ''}" placeholder="факт"
+                 style="width:92px;text-align:right" aria-label="Сколько есть на самом деле">
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="stick">
+      <button class="btn" id="inv-review" type="button">Посмотреть итог</button>
+      <button class="btn line" id="inv-cancel" type="button">Отменить инвентаризацию</button>
+    </div>`;
+}
+/** Счётчики вверху обновляются на месте: перерисовка отняла бы у человека место ввода. */
+function invRefresh() {
+  const n = document.getElementById('inv-n');
+  const z = document.getElementById('inv-z');
+  if (n) n.textContent = `${Object.keys(data.invDraft?.counts ?? {}).filter((id) => good(id)).length} из ${data.goods.length}`;
+  if (z) z.textContent = invDiffs().length;
+}
+const invDiffText = (n, base) => (n === base ? 'сошлось' : `разница ${signed_(n - base)}`);
+
+/** Итог инвентаризации: лист «посмотреть перед записью» и «прошлая». */
+function sheetInv(rec, mode) {
+  const lines = rec.lines;
+  const value = lines.reduce((s, l) => s + l.diff * l.cost, 0);
+  const lack = lines.filter((l) => l.diff < 0).reduce((s, l) => s + l.diff * l.cost, 0);
+  const extra = lines.filter((l) => l.diff > 0).reduce((s, l) => s + l.diff * l.cost, 0);
+  return `
+    <h3>${mode === 'review' ? 'Итог инвентаризации' : 'Инвентаризация'}</h3>
+    ${mode === 'view' ? `<p class="q">${stamp(rec.at)}, провёл(а) ${esc(rec.by)}. Посчитано товаров: ${rec.counted}.</p>` : `<p class="q">Посчитано товаров: ${rec.counted}.</p>`}
+    ${lines.length === 0 ? '<p class="q">Расхождений нет: всё сошлось.</p>' : `
+      <div class="rows">${lines.map((l) => `
+        <div class="row"><div class="grow"><div class="t">${esc(l.name)}</div>
+          <div class="q2 n">по учёту ${l.was} → есть ${l.now}</div></div>
+          <div style="text-align:right"><div class="amt n" style="color:${l.diff < 0 ? 'var(--alarm)' : 'var(--money)'}">${signed_(l.diff)} шт</div>
+            <div class="q2 n">${som(l.diff * l.cost)}</div></div></div>`).join('')}</div>
+      <div class="figures" style="margin-top:12px">
+        <div class="figure"><b style="color:var(--alarm)">${som(lack)}</b><span>недостача по закупу</span></div>
+        <div class="figure"><b style="color:var(--money)">${som(extra)}</b><span>излишек по закупу</span></div>
+        <div class="figure"><b>${som(value)}</b><span>итого</span></div>
+      </div>`}
+    ${mode === 'review' ? `
+      <p class="q2" style="margin-top:12px">После записи остатки на складе станут такими, как посчитано. Отменить запись нельзя, а в журнале приёмки останется след.</p>
+      <button class="btn" id="inv-apply" type="button">${svg('check')}Записать в остатки</button>
+      <button class="btn line" data-shut="1" type="button">Назад к подсчёту</button>`
+    : '<button class="btn line" data-shut="1" type="button">Закрыть</button>'}`;
+}
+
 function viewIntake() {
   return `
     <p class="hint">Приём товара. Пикните коробку: знакомый код — просто добавится количество, незнакомый — выберете из списка, что это за модель. Карточку заводят один раз на модель, а не на каждую трубку.</p>
     ${scanBox()}
+
+    ${owner() ? `<button class="btn line" id="inv-start" type="button">${data.invDraft ? 'Продолжить инвентаризацию' : 'Инвентаризация: пересчитать остатки'}</button>` : ''}
 
     <h2>Что на остатке</h2>
     <div class="rows">
@@ -2104,6 +2229,8 @@ function viewReport() {
             <div class="q2 n" style="text-align:right;color:var(--money)">${som(r.profit)}</div>
           </div>`).join('')}
       </div>`}
+
+    ${inventoriesBox()}
 
     ${intakeBox()}
 
@@ -2234,6 +2361,14 @@ function viewMore() {
            <button class="btn line" id="owner-in" type="button">Войти как владелец</button>`}
 
     ${owner() ? `
+      <h2>Магазин</h2>
+      <div class="rows" style="padding:13px">
+        <label class="fld" style="margin-bottom:0"><span>Название магазина</span>
+          <input id="shop-name" maxlength="40" value="${esc(data.shopName)}" autocomplete="off"></label>
+        <p class="q2" style="margin:8px 0 0">Показывается в шапке, на чеках и в выгрузке в Excel.</p>
+        <button class="btn" id="shop-save" type="button">Сохранить</button>
+      </div>
+
       <h2>Кассиры</h2>
       <div class="rows" style="padding:13px">
         <p class="q" style="margin:0 0 10px">Кассир перед продажей нажимает на своё имя, и чеки записываются на него.</p>
@@ -2868,6 +3003,7 @@ function sheetReceipt(id) {
   return `
     <h3>${back ? 'Возврат' : 'Чек'}</h3>
     <div class="sheetpaper">
+      <div class="meta"><b>${esc(data.shopName)}</b></div>
       <h4>${back ? `Возврат № ${checkNo(c)}${orig ? ` по чеку № ${checkNo(orig)}` : ''}` : `Товарный чек № ${checkNo(c)}`}</h4>
       <div class="meta">${new Date(c.at).toLocaleString('ru-RU')}, ${back ? 'оформил(а)' : 'продал'} ${esc(c.by)}</div>
       <table>
@@ -2948,6 +3084,9 @@ function render() {
   document.getElementById('app').hidden = false;
 
   document.getElementById('who').textContent = owner() ? 'Владелец' : me()?.name ?? 'Выберите имя';
+  document.getElementById('shop').textContent = data.shopName;
+  // Заголовок окна программы повторяет название магазина.
+  document.title = `Касса — ${data.shopName}`;
 
   const link = document.getElementById('link');
   link.textContent = online ? 'в сети' : 'без сети';
@@ -2961,6 +3100,7 @@ function render() {
   const keep = main.scrollTop;
   main.innerHTML = tab === 'sale' ? viewSale()
     : tab === 'intake' ? viewIntake()
+    : tab === 'inv' ? viewInventory()
     : tab === 'report' ? viewReport()
     : tab === 'goods' ? viewGoods()
     : tab === 'checks' ? viewChecks()
@@ -2968,9 +3108,10 @@ function render() {
   main.scrollTop = keep;
 
   const tabs = TABS[owner() ? 'owner' : 'cashier'];
-  if (!tabs.some((t) => t.id === tab)) tab = 'sale';
+  if (tab !== 'inv' && !tabs.some((t) => t.id === tab)) tab = 'sale';
+  if (tab === 'inv' && !owner()) tab = 'sale';
   document.getElementById('nav').innerHTML = tabs.map((t) =>
-    `<button type="button" data-tab="${t.id}" aria-selected="${t.id === tab}">${svg(t.icon)}${t.text}</button>`).join('');
+    `<button type="button" data-tab="${t.id}" aria-selected="${t.id === tab || (tab === 'inv' && t.id === 'intake')}">${svg(t.icon)}${t.text}</button>`).join('');
 
   const t = total();
   const till = document.getElementById('till');
@@ -3001,6 +3142,8 @@ function render() {
     : sheet.k === 'close' ? sheetShift({ ...shiftSummary(), to: Date.now(), by: sellerName() }, 'close')
     : sheet.k === 'shiftview' ? sheetShift(data.shifts.find((x) => x.id === sheet.id), sheet.fresh ? 'done' : 'view')
     : sheet.k === 'return' ? sheetReturn(sheet.id)
+    : sheet.k === 'invreview' ? sheetInv({ counted: Object.keys(data.invDraft?.counts ?? {}).filter((id) => good(id)).length, lines: invLines(invDiffs()) }, 'review')
+    : sheet.k === 'invview' ? sheetInv(data.inventories.find((x) => x.id === sheet.id), 'view')
     : sheet.k === 'cam' ? sheetCam()
     : '';
   host.innerHTML = `<div class="veil" data-veil="1"><div class="sheet"><div class="grip"></div>${body}</div></div>`;
@@ -3147,6 +3290,44 @@ document.addEventListener('click', (event) => {
     save(); render();
     return flash(`${s.name} убран(а). Прошлые чеки остаются`);
   }
+
+  /* инвентаризация */
+  if (el.id === 'inv-start') {
+    if (!owner()) return;
+    if (!data.invDraft) data.invDraft = { at: Date.now(), by: sellerName(), counts: {} };
+    invSearch = ''; tab = 'inv';
+    save(); return render();
+  }
+  if (el.id === 'inv-q-clear') { invSearch = ''; return render(); }
+  if (el.id === 'inv-review') {
+    if (!owner() || !data.invDraft) return;
+    if (Object.keys(data.invDraft.counts).filter((id) => good(id)).length === 0) return flash('Пока ничего не посчитано');
+    sheet = { k: 'invreview' }; return render();
+  }
+  if (el.id === 'inv-cancel') {
+    if (!owner()) return;
+    data.invDraft = null; tab = 'intake'; sheet = null;
+    save(); render();
+    return flash('Инвентаризация отменена, остатки не менялись');
+  }
+  if (el.id === 'inv-apply') {
+    const draft = data.invDraft;
+    if (!owner() || !draft) return;
+    const diffs = invDiffs();
+    const counted = Object.keys(draft.counts).filter((id) => good(id)).length;
+    if (counted === 0) return flash('Пока ничего не посчитано');
+    const lines = invLines(diffs);
+    // Сдвигаем остаток на разницу, а не ставим число: продажи после пересчёта не теряются.
+    for (const { g, diff } of diffs) {
+      g.stock = Math.max(0, g.stock + diff);
+      logIntake(g, diff, 'inv');
+    }
+    data.inventories.push({ id: 'v' + Date.now(), at: Date.now(), from: draft.at, by: sellerName(), counted, lines });
+    data.invDraft = null; tab = 'intake'; sheet = null;
+    save(); render();
+    return flash(lines.length ? `Инвентаризация записана: расхождений ${lines.length}` : 'Инвентаризация записана: всё сошлось');
+  }
+  if (d.invview) { sheet = { k: 'invview', id: d.invview }; return render(); }
 
   /* возврат */
   if (el.id === 'ret-open') {
@@ -3466,6 +3647,13 @@ document.addEventListener('click', (event) => {
   if (d.receipt) { sheet = { k: 'receipt', id: d.receipt }; return render(); }
 
   /* настройки */
+  if (el.id === 'shop-save') {
+    const name = document.getElementById('shop-name').value.trim().replace(/\s+/g, ' ');
+    if (!name) return flash('Впишите название магазина');
+    data.shopName = name.slice(0, 40);
+    save(); render();
+    return flash(`Магазин: ${data.shopName}`);
+  }
   if (el.id === 'limit-toggle') {
     data.limitOn = !data.limitOn;
     save(); render();
@@ -3520,13 +3708,34 @@ document.addEventListener('click', (event) => {
   }
 });
 
+/* Подсчёт сохраняем, когда поле отпустили: не на каждую цифру. */
+document.addEventListener('change', (event) => {
+  if (event.target.dataset?.inv !== undefined) save();
+});
+
 /* Наценка и цена ходят парой: меняешь одно — пересчитывается второе. */
 document.addEventListener('input', (event) => {
+  const invId = event.target.dataset?.inv;
+  if (invId) {
+    const g = good(invId);
+    const d = data.invDraft;
+    if (!g || !d) return;
+    const raw = event.target.value;
+    const note = document.getElementById('inv-d-' + invId);
+    if (raw === '') { delete d.counts[invId]; if (note) note.textContent = ''; invRefresh(); return; }
+    const n = Math.floor(Number(raw));
+    if (!(n >= 0)) return;
+    // Остаток на момент пересчёта запоминаем: от него и считается разница.
+    d.counts[invId] = { n, base: g.stock };
+    if (note) note.textContent = invDiffText(n, g.stock);
+    invRefresh();
+    return;
+  }
   const id = event.target.id;
 
   // Отбор перерисовывает список под полем, поэтому возвращаем в поле
   // и место ввода: иначе с третьей буквы курсор прыгает в начало.
-  for (const [поле, запись] of [['q', (v) => { search = v; }], ['pick-q', (v) => { pick = v; }], ['chk-q', (v) => { chkSearch = v; }], ['pl-q', (v) => { plSearch = v; }]]) {
+  for (const [поле, запись] of [['q', (v) => { search = v; }], ['pick-q', (v) => { pick = v; }], ['chk-q', (v) => { chkSearch = v; }], ['pl-q', (v) => { plSearch = v; }], ['inv-q', (v) => { invSearch = v; }]]) {
     if (id !== поле) continue;
     запись(event.target.value);
     const pos = event.target.selectionStart;
