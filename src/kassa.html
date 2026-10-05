@@ -1157,16 +1157,16 @@ function buildWorkbook() {
   ];
 
   const shiftRows = [
-    ['Открыта', 'Закрыта', 'Закрыл(а)', 'Чеков', 'Штук', 'Выручка', 'Себестоимость', 'Прибыль', 'Скидок', 'Средний чек'],
+    ['Открыта', 'Закрыта', 'Открыл(а)', 'Закрыл(а)', 'Чеков', 'Штук', 'Выручка', 'Себестоимость', 'Прибыль', 'Скидок', 'Средний чек'],
     ...data.shifts.map((r) => [
-      new Date(r.from).toLocaleString('ru-RU'), new Date(r.to).toLocaleString('ru-RU'), r.by,
+      new Date(r.from).toLocaleString('ru-RU'), new Date(r.to).toLocaleString('ru-RU'), r.openedBy ?? '', r.by,
       r.checks, r.units, r.revenue, r.cost, r.profit, r.off, r.avg,
     ]),
   ];
 
   return makeWorkbook([
     { name: 'Сводка', rows: summary, widths: [34, 16, 52, 52] },
-    { name: 'Смены', rows: shiftRows, widths: [18, 18, 16, 8, 8, 12, 14, 12, 10, 12] },
+    { name: 'Смены', rows: shiftRows, widths: [18, 18, 16, 16, 8, 8, 12, 14, 12, 10, 12] },
     { name: 'Товары', rows: goods, widths: [30, 16, 10, 10, 11, 9, 18, 9, 15, 12, 12, 15] },
     { name: 'Продажи', rows: sales, widths: [12, 9, 12, 10, 12, 10, 15, 12] },
     { name: 'Позиции чеков', rows: lines, widths: [12, 9, 30, 9, 11, 10, 12] },
@@ -1315,6 +1315,8 @@ const SEED = {
   shifts: [],
   /** С какого момента идут чеки текущей смены. null — смену ещё не закрывали. */
   shiftStart: null,
+  /** Кто и когда открыл текущую смену. null — смена не открыта, продавать нельзя. */
+  shiftOpen: null,
   notes: [],
 };
 
@@ -1461,6 +1463,7 @@ function fixUp(d) {
   if (!d.sold || typeof d.sold !== 'object') d.sold = {};
   if (!Array.isArray(d.shifts)) d.shifts = [];
   if (typeof d.shiftStart !== 'number') d.shiftStart = null;
+  if (!d.shiftOpen || typeof d.shiftOpen.at !== 'number') d.shiftOpen = null;
   // Что продано до этой перемены, тоже считается проданным.
   const штучные = new Set((d.goods ?? []).filter((g) => g.serial).map((g) => g.name));
   for (const c of d.checks ?? []) {
@@ -1550,6 +1553,13 @@ const owner = () => data.role === 'owner';
 const me = () => data.staff.find((s) => s.id === sellerId) ?? null;
 const sellerName = () => (owner() ? 'Владелец' : me()?.name ?? null);
 
+/** Пока смена не открыта, продавать нельзя: итог некому и некогда записывать. */
+function needOpen() {
+  if (data.shiftOpen) return false;
+  flash('Сначала откройте смену');
+  return true;
+}
+
 /** Пока кассир не выбрал себя, продавать нельзя: чек не на кого записать. */
 function needName() {
   if (owner() || me()) return false;
@@ -1629,7 +1639,8 @@ function shiftSummary() {
     }
   }
   return {
-    from: data.shiftStart ?? list[0]?.at ?? Date.now(),
+    from: data.shiftOpen?.at ?? data.shiftStart ?? list[0]?.at ?? Date.now(),
+    openedBy: data.shiftOpen?.by ?? null,
     checks: list.length, units, revenue, cost, profit: revenue - cost, off,
     avg: list.length ? Math.round(revenue / list.length) : 0,
     byWho: [...byWho.values()].sort((a, b) => b.sum - a.sum),
@@ -1640,7 +1651,7 @@ function shiftSummary() {
 /** Итог словами — чтобы отправить хозяину сообщением. Прибыль только владельцу. */
 function shiftText(r) {
   return [
-    `Смена ${stamp(r.from)} — ${stamp(r.to)}, закрыл(а) ${r.by}`,
+    `Смена ${stamp(r.from)} — ${stamp(r.to)}${r.openedBy ? `, открыл(а) ${r.openedBy}` : ''}, закрыл(а) ${r.by}`,
     `Выручка: ${som(r.revenue)}`,
     ...(owner() ? [`Прибыль: ${som(r.profit)}`] : []),
     `Чеков: ${r.checks}, штук: ${r.units}, средний чек: ${som(r.avg)}`,
@@ -1653,10 +1664,10 @@ function shiftText(r) {
 /** Блок с кнопкой закрытия — для экранов, где смену обычно и заканчивают. */
 function closeBox() {
   const list = shift();
-  const from = data.shiftStart ?? list[0]?.at;
+  const from = data.shiftOpen?.at ?? data.shiftStart ?? list[0]?.at;
   return `
     <h2>Закрытие смены</h2>
-    <p class="q">${from ? `Смена идёт с ${stamp(from)}.` : 'Смена ещё не начиналась.'} Продаж: ${list.length}.
+    <p class="q">${data.shiftOpen ? `Смена открыта ${stamp(data.shiftOpen.at)} (${esc(data.shiftOpen.by)}).` : from ? `Смена идёт с ${stamp(from)}.` : 'Смена не открыта.'} Продаж: ${list.length}.
       Закройте её, когда закончили: получится итог, а счёт новой смены пойдёт с нуля.</p>
     <button class="btn" id="shift-close" type="button">Закрыть смену</button>`;
 }
@@ -1732,7 +1743,7 @@ function onScan(code) {
     return;
   }
 
-  if (needName()) return;
+  if (needName() || needOpen()) return;
 
   if (data.sold[code]) { flash(`Эта коробка уже продана ${soldDay(data.sold[code])}`); return; }
   if (!g) {
@@ -1807,8 +1818,16 @@ function viewWho() {
     </div>`;
 }
 
+function viewOpen() {
+  return `
+    <h2>Смена не открыта</h2>
+    <p class="q">Откройте смену, чтобы начать продажи. Запишется, кто и когда её открыл.</p>
+    <button class="btn" id="shift-open" type="button">${svg('check')}Открыть смену</button>`;
+}
+
 function viewSale() {
   if (!owner() && !me()) return viewWho();
+  if (!data.shiftOpen) return viewOpen();
   const t = total();
   return `
     <div class="two-pane">
@@ -2546,7 +2565,7 @@ function sheetShift(r, mode) {
   const title = mode === 'close' ? 'Закрыть смену?' : mode === 'done' ? 'Смена закрыта' : 'Итог смены';
   return `
     <h3>${title}</h3>
-    <p class="q">${stamp(r.from)} — ${stamp(r.to)}, ${mode === 'close' ? 'закрывает' : 'закрыл(а)'} ${esc(r.by)}</p>
+    <p class="q">${stamp(r.from)} — ${stamp(r.to)}.${r.openedBy ? ` Открыл(а) ${esc(r.openedBy)},` : ''} ${mode === 'close' ? 'закрывает' : 'закрыл(а)'} ${esc(r.by)}</p>
     <div class="figures">
       <div class="figure"><b>${som(r.revenue)}</b><span>выручка</span></div>
       <div class="figure"><b>${r.checks}</b><span>чеков</span></div>
@@ -2730,7 +2749,7 @@ function render() {
 function sell() {
   const t = total();
   if (t.count === 0) return;
-  if (needName()) return;
+  if (needName() || needOpen()) return;
 
   // Последняя проверка перед списанием: остаток мог измениться, пока чек лежал.
   for (const l of check) {
@@ -2857,7 +2876,14 @@ document.addEventListener('click', (event) => {
     return flash(`${s.name} убран(а). Прошлые чеки остаются`);
   }
 
-  /* закрытие смены */
+  /* открытие и закрытие смены */
+  if (el.id === 'shift-open') {
+    if (needName()) return;
+    if (data.shiftOpen) return render();
+    data.shiftOpen = { at: Date.now(), by: sellerName(), byId: owner() ? 'owner' : me().id };
+    save(); render();
+    return flash(`Смена открыта, ${sellerName()}`);
+  }
   if (el.id === 'shift-close') {
     if (needName()) return;
     if (check.length) return flash('Сначала закончите или отмените чек');
@@ -2873,6 +2899,7 @@ document.addEventListener('click', (event) => {
     const to = Date.now();
     const rec = { id: 'sh' + to, ...summary, to, by: sellerName(), byId: owner() ? 'owner' : me().id };
     data.shifts.push(rec);
+    data.shiftOpen = null;
     // +1: чек, оформленный в ту же миллисекунду, не должен попасть в обе смены.
     data.shiftStart = to + 1;
     // Следующий кассир выберет себя сам: смена закончилась вместе с прежним.
@@ -2893,7 +2920,7 @@ document.addEventListener('click', (event) => {
 
   /* продажа */
   if (d.add) {
-    if (needName()) return;
+    if (needName() || needOpen()) return;
     const g = good(d.add);
     if (!g || g.stock <= 0) return flash('На остатке ноль');
     if (!addLine(d.add)) return;

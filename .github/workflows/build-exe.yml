@@ -1,0 +1,49 @@
+name: Сборка Касса.exe
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+
+  build:
+    needs: tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+      - run: npm ci
+      # Портативная версия: один файл Касса.exe, ставить не надо.
+      - run: npm run dist
+      # Установщик: ярлык на рабочем столе и в меню «Пуск».
+      - run: npm run dist:setup
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kassa-exe
+          path: |
+            dist-exe/Касса.exe
+            dist-exe/Kassa-Setup-*.exe
+          if-no-files-found: error

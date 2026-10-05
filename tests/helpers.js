@@ -58,7 +58,12 @@ async function open({ role = 'cashier', seed = null, desk = null } = {}) {
     text: async () => page.locator('#screen').innerText(),
     scan: (code) => page.evaluate((c) => onScan(c), code),
     state: (fn, arg) => page.evaluate(fn, arg),
-    pickName: (id = 's1') => page.click(`[data-who="${id}"]`),
+    pickName: async (id = 's1') => {
+      await page.click(`[data-who="${id}"]`);
+      // Продавать можно только в открытой смене.
+      if (await page.locator('#shift-open').count()) await page.click('#shift-open');
+    },
+    openShift: () => page.evaluate(() => { data.shiftOpen = { at: Date.now(), by: sellerName() ?? 'Владелец', byId: 'owner' }; render(); }),
     close: () => context.close(),
   };
   return k;

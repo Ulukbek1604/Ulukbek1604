@@ -281,6 +281,7 @@ kassa('чек записывается на выбранного кассира'
 });
 
 kassa('владелец продаёт как «Владелец»', { role: 'owner' }, async (k) => {
+  await k.openShift();
   await k.scan(GLASS);
   await k.state(() => sell());
   const c = await k.state(() => data.checks.at(-1));
